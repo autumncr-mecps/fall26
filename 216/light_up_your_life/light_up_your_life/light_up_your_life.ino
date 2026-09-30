@@ -13,9 +13,8 @@ int last_btn_val = 0;
 // for timing
 long print_clock;       // mode 0, print once every second
 long ca_clock;          // for calculating the cumulative average over 2 seconds
-long blink_clock;       // for mode 2, blink timer
-long mode_change_clock; // keeps track of how long we're displaying the mode shift
 long ca_display_clock;  // displaying the average
+long blink_clock;       // for mode 2, blink timer
 
 // cumulative average
 double ca = 0;
@@ -191,7 +190,7 @@ void mode1(uint16_t lux) {
 }
 
 /*
- * mode 2: 
+ * mode 2: control blink speed with brightness
  */
 void mode2() {
   // blinking
@@ -214,7 +213,8 @@ void mode2() {
     return;
   }
 
-  // async blink (hey that rhymes)
+  // async blink
+  // technically I should probably say "non-blocking" but I like that it rhymes
   if (millis() - blink_clock > blink_speed) {
     blink_on = !blink_on;
     digitalWrite(LED_BUILTIN, blink_on);
