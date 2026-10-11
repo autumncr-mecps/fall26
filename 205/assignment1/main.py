@@ -23,7 +23,7 @@ def read_word_2c(adr):
 # let us write to 
 def output(val):
     f.write(val)
-    print(val)
+    print(val, end="")
 
 bus = smbus.SMBus(1) # or bus = smbus.SMBus(1) for Revision 2 boards
 address = 0x68       # This is the address value read via the i2cdetect command
@@ -36,15 +36,15 @@ f = open("data.txt", "w")
 start = time.time()
 tick = time.time()
 
-while time.time() - start <= 1.0:
+while time.time() - start <= 60.0:
     # non-blocking
     if time.time() - tick >= 0.1:
         gyro_xout = read_word_2c(0x43)
         gyro_yout = read_word_2c(0x45)
         gyro_zout = read_word_2c(0x47)
 
-        output("raw gyro x y z:")
-        output(f"{gyro_xout}\t{gyro_yout}\t{gyro_zout}")
+        output("raw gyro x y z:\n")
+        output(f"{gyro_xout}\t{gyro_yout}\t{gyro_zout}\n")
 
         # I wasn't able to figure out where the 131 constant was coming from.
         # I think this is measured in degrees per second squared, and by default
@@ -52,14 +52,14 @@ while time.time() - start <= 1.0:
         # 
         # is this to do with converting it to radians or something??
         # or to rotations per second?
-        output("scaled gyro x y z:")
-        output(f"{(gyro_xout / 131)}deg/s^2\t{(gyro_yout / 131)}deg/s^2\t{(gyro_zout / 131)}deg/s^2\t")
+        output("scaled gyro x y z:\n")
+        output(f"{(gyro_xout / 131):0.2}deg/s\t{(gyro_yout / 131):0.2}deg/s\t{(gyro_zout / 131):0.2}deg/s\n\n")
 
-        output("raw accel x y z:")
+        output("raw accel x y z:\n")
         accel_xout = read_word_2c(0x3b)
         accel_yout = read_word_2c(0x3d)
         accel_zout = read_word_2c(0x3f)
-        output(f"{accel_xout}\t{accel_yout}\t{accel_zout}")
+        output(f"{accel_xout}\t{accel_yout}\t{accel_zout}\n")
 
         # each word is 16 bits, meaning a total range of 65536 possible values
         # this needs to be signed, so +g is 0 to 32767 and -g is -1 through -32768
@@ -75,5 +75,5 @@ while time.time() - start <= 1.0:
         accel_yout_scaled = accel_yout / 16384.0
         accel_zout_scaled = accel_zout / 16384.0
 
-        output("scaled acceleration x y z:")
-        output(f"{accel_xout_scaled}g\t{accel_yout_scaled}g\t{accel_zout_scaled}g")
+        output("scaled acceleration x y z:\n")
+        output(f"{accel_xout_scaled:0.2}g\t{accel_yout_scaled:0.2}g\t{accel_zout_scaled:.04}g\n\n")
