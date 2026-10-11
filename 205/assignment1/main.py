@@ -46,13 +46,10 @@ while time.time() - start <= 60.0:
         output("raw gyro x y z:\n")
         output(f"{gyro_xout}\t{gyro_yout}\t{gyro_zout}\n")
 
-        # I wasn't able to figure out where the 131 constant was coming from.
-        # I think this is measured in degrees per second squared, and by default
-        # the range is +/- 250 degrees per second squared
-        # 
-        # is this to do with converting it to radians or something??
-        # or to rotations per second?
         output("scaled gyro x y z:\n")
+        # By default, the gyroscope measures +/-250 degrees per second.
+        # This means a value of +250 would correspond to 32767. 32767/250 = 131 (approx)
+        # Ergo, dividing the gyroscope output by 131 gives you a measure of degrees per second
         output(f"{(gyro_xout / 131):0.2}deg/s\t{(gyro_yout / 131):0.2}deg/s\t{(gyro_zout / 131):0.2}deg/s\n\n")
 
         output("raw accel x y z:\n")
@@ -70,7 +67,7 @@ while time.time() - start <= 60.0:
         # measure larger swings in acceleration
         # 
         # when the sensor is in +/-2g mode (default), a value of 16384 is
-        # equivalent to 1g. Thereefore, dividing by 16384
+        # equivalent to 1g. Therefore, dividing by 16384
         accel_xout_scaled = accel_xout / 16384.0
         accel_yout_scaled = accel_yout / 16384.0
         accel_zout_scaled = accel_zout / 16384.0
