@@ -1,6 +1,5 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
-#include <driver/adc.h>
 
 /*
 const char *ssid = "UCInet Mobile Access";
@@ -11,7 +10,7 @@ const char *ssid = "KittenLAN";
 const char *pwd = "kittens_r_c00l";
 
 const int port = 6666;
-const char* addr = "172.29.213.230";
+const char* addr = "192.168.1.69";
 
 WiFiUDP udp;
 
@@ -20,7 +19,7 @@ char buf[64] = {0};
 unsigned long sensor_clock;
 int sensor_vals[5] = {0};
 int sensor_idx = 0;
-int sensor_pin = 39;
+int sensor_pin = 36;
 
 unsigned long led_clock;
 int led_val = 1;
@@ -39,15 +38,13 @@ void setup() {
     Serial.println("...");
   }
 
-  Serial.println("...WiFi Connected");
+  Serial.print("...WiFi connected. IP: ");
+  Serial.println(WiFi.localIP());
   Serial.println("Beginning UDP...");
   
   udp.begin(port);
 
   Serial.println("Waiting for INIT");
-
-  adc1_config_width(ADC_WIDTH_BIT_12);
-  adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_0);
 }
 
 void loop() {
@@ -86,7 +83,7 @@ void process() {
     // if it's been at least 1000ms since we read from the sensor, read from the sensor
     if (m - sensor_clock >= 1000) {
       // read photoresistor
-      int photor_val = adc1_get_raw(ADC1_CHANNEL_0);
+      int photor_val = analogRead(sensor_pin);
       sensor_vals[sensor_idx % 5] = photor_val;
       sensor_idx++;
       sensor_clock = millis();
