@@ -25,6 +25,8 @@ int sensor_pin = 39;
 unsigned long led_clock;
 int led_val = 1;
 
+int state = 0;
+
 void setup() {
   Serial.begin(9600);
 
@@ -42,22 +44,37 @@ void setup() {
   
   udp.begin(port);
 
+  Serial.println("Waiting for INIT");
+
   adc1_config_width(ADC_WIDTH_BIT_12);
   adc1_config_channel_atten(ADC1_CHANNEL_0,ADC_ATTEN_DB_0);
 }
 
 void loop() {
-  if (sensor_idx == 0) {
-    udp.parsePacket();
-    if(udp.read(buf, 50) > 0){
-      Serial.println("Received first message");
+  input();
+  process();
+}
 
+void input() {
+  udp.parsePacket();
+  if(udp.read(buf, 50) > 0){
+    Serial.println("Received first message");
+    if (strcmp(buf, "INIT") == 0 && state == 0){
       // this way these will proc immediately
-      led_clock = -1000;
+      led_clock = -500;
       sensor_clock = -1000;
+      state = 1;
+    }
+    else if (strcmp(buf, "STOP") == 0 && state == 0){
+      digitalWrite(LED_BUILTIN, LOW);
+      led_val = 0;
+      state = 0;
     }
   }
-  else {
+}
+
+void process() {
+  if (state == 1)  {
     // so we're only calling millis() once
     unsigned long m = millis();
     // if it's been at least 500ms since we blinked, blink
@@ -68,7 +85,7 @@ void loop() {
     }
     // if it's been at least 1000ms since we read from the sensor, read from the sensor
     if (m - sensor_clock >= 1000) {
-      // read for
+      // read photoresistor
       int photor_val = adc1_get_raw(ADC1_CHANNEL_0);
       sensor_vals[sensor_idx % 5] = photor_val;
       sensor_idx++;
@@ -77,20 +94,24 @@ void loop() {
       // every 2 seconds, send the 5 most recent vals
       // only start once we've gathered at least 5 readings
       if (sensor_idx >= 5 && sensor_idx % 2 == 1) {
-        // calculate the average
-        float avg = 0;
-        for (int i = 0; i < 5; i++) {
-          avg += sensor_vals[i];
-        }
-        avg /= 5.0;
-        int avg_int = round(avg);
-
-        // make it a nice int and send it over
-        itoa(avg_int, buf, 10);
-        udp.beginPacket(addr, port);
-        udp.write(buffer, 64);
-        udp.endPacket();
+        output();
       }
-    } 
+    }
   }
+}
+
+void output() {
+  // calculate the average
+  float avg = 0;
+  for (int i = 0; i < 5; i++) {
+    avg += sensor_vals[i];
+  }
+  avg /= 5.0;
+  int avg_int = round(avg);
+
+  // make it a nice hexadecimal int and send it over
+  itoa(avg_int, buf, 16);
+  udp.beginPacket(addr, port);
+  udp.write((uint8_t *)buf, 64);
+  udp.endPacket();
 }

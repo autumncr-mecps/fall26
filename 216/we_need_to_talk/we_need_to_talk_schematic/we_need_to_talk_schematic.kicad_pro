@@ -255,7 +255,8 @@
   "libraries": {
     "pinned_footprint_libs": [],
     "pinned_symbol_libs": [
-      "MECPS"
+      "MECPS",
+      "mecps"
     ]
   },
   "meta": {
@@ -287,8 +288,8 @@
     "meta": {
       "version": 5
     },
-    "net_colors": {},
-    "netclass_assignments": {},
+    "net_colors": null,
+    "netclass_assignments": null,
     "netclass_patterns": []
   },
   "pcbnew": {
@@ -432,7 +433,7 @@
         "uuid": "c20abe86-d217-4416-9a9f-6bfc211fa182"
       }
     ],
-    "used_designators": "1,D1-5,R1-7",
+    "used_designators": "1,D1-5,R1-8,U1,SW1",
     "variants": []
   },
   "sheets": [
