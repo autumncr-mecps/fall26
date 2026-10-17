@@ -9,12 +9,13 @@ const char *pwd = "";
 const char *ssid = "KittenLAN";
 const char *pwd = "kittens_r_c00l";
 
-const int port = 6666;
+const int port_in = 6667;
+const int port_out = 6666;
 const char* addr = "192.168.1.69";
 
 WiFiUDP udp;
 
-char buf[64] = {0};
+char buf[8] = {0};
 
 unsigned long sensor_clock;
 int sensor_vals[5] = {0};
@@ -42,7 +43,7 @@ void setup() {
   Serial.println(WiFi.localIP());
   Serial.println("Beginning UDP...");
   
-  udp.begin(port);
+  udp.begin(port_in);
 
   Serial.println("Waiting for INIT");
 }
@@ -54,15 +55,18 @@ void loop() {
 
 void input() {
   udp.parsePacket();
-  if(udp.read(buf, 50) > 0){
-    Serial.println("Received first message");
+  if(udp.read(buf, 8) > 0){
+    Serial.print("Received message: ");
+    Serial.println(buf);
     if (strcmp(buf, "INIT") == 0 && state == 0){
       // this way these will proc immediately
+      Serial.println("INIT");
       led_clock = -500;
       sensor_clock = -1000;
       state = 1;
     }
-    else if (strcmp(buf, "STOP") == 0 && state == 0){
+    else if (strcmp(buf, "STOP") == 0 && state == 1){
+      Serial.println("STOP");
       digitalWrite(LED_BUILTIN, LOW);
       led_val = 0;
       state = 0;
@@ -107,8 +111,10 @@ void output() {
   int avg_int = round(avg);
 
   // make it a nice hexadecimal int and send it over
-  itoa(avg_int, buf, 16);
-  udp.beginPacket(addr, port);
-  udp.write((uint8_t *)buf, 64);
+  itoa(avg_int, buf, 10);
+  Serial.print("sending output: ");
+  Serial.println(buf);
+  udp.beginPacket(addr, port_out);
+  udp.write((uint8_t *)buf, 8);
   udp.endPacket();
 }
