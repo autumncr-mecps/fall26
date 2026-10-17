@@ -1,11 +1,12 @@
 import socket
-from gpiozero import button
+from gpiozero import Button
 from gpiozero import LED
 import time
 
 UDP_PORT_IN = 6666
 UDP_PORT_OUT = 6667
-addr = ""
+UDP_ADDR_OUT = ""
+addr = ("192.168.1.71", UDP_PORT_OUT)
 
 state_button = Button(21)
 indicator_led = [LED(23), LED(24), LED(25)];
@@ -29,23 +30,27 @@ print("waiting for initialization")
 
 
 def input():
-    data = s.recvfrom(40)
-    print("received message: %s" % data)
-    return data[0]
+    data = s.recv(8).decode()
+    print("received data: " + data)
+    return data
 
 def process(data):
-    print("processing data " + data)
+    indicator_led[0].on()
+    time.sleep(0.1)
+    indicator_led[0].off()
 
 def output():
-    print("BUTTON PRESSED")
+    global state
     if state == 0:
         s.sendto(b"INIT",  addr)
+        print("INIT");
         state = 1
-    if state == 1:
+    elif state == 1:
         s.sendto(b"STOP", addr)
+        print("STOP")
         state = 0
 
-button.whenpressed = output
+state_button.when_pressed = output
 
 while True:
     if state == 1:
