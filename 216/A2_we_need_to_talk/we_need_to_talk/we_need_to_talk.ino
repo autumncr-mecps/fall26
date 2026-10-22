@@ -58,17 +58,25 @@ void input() {
   if(udp.read(buf, 8) > 0){
     Serial.print("Received message: ");
     Serial.println(buf);
-    if (strcmp(buf, "INIT") == 0 && state == 0){
+    if (strcmp(buf, "INIT") == 0 && state == 0) {
       // this way these will proc immediately
       Serial.println("INIT");
       led_clock = -500;
       sensor_clock = -1000;
       state = 1;
     }
-    else if (strcmp(buf, "STOP") == 0 && state == 1){
+    else if (strcmp(buf, "STOP") == 0 && state == 1) {
       Serial.println("STOP");
       digitalWrite(LED_BUILTIN, LOW);
       led_val = 0;
+      state = 0;
+    }
+    else if (strcmp(buf, "WTFDUDE") == 0) {
+      // send the packet immediately
+      buf = "SORRY";
+      udp.beginPacket(addr, port_out);
+      udp.write((uint8_t *)buf, 8);
+      udp.endPacket();
       state = 0;
     }
   }
