@@ -1,10 +1,3 @@
-"""
-This ended up being pretty different than what Jonathan and I were talking about in class,
-because we ended up working alone after all. Instead of implementing a pheromone trail type
-simulation, I went really heavy on probability in a way that lead to some pretty fun results.
-
-"""
-
 import pygame
 import random
 import util
@@ -49,7 +42,7 @@ class Ant(pygame.sprite.Sprite):
     
     def __init__(self, x, y, idx, food_found_dir, food_delivered_count):
         super().__init__()
-        self.loc = [x, y]
+        self.loc = [x + 10, y + 10]
         # even after we've found food, chance of going in one of the normal directions
         # however, the more food has been delivered, the more likely it is that we'll go in that direction
         if len(food_found_dir) != 4 or random.randint(0, food_delivered_count) == 0:
@@ -126,8 +119,8 @@ class Ant(pygame.sprite.Sprite):
                     self.dir_probs[i] += random.randint(-15, 15)
 
         elif self.state == 2:
-            dist_x = anthill[0] - 10 - self.loc[0]
-            dist_y = self.loc[1] - anthill[1] - 10
+            dist_x = (anthill[0] + 10) - self.loc[0]
+            dist_y = self.loc[1] - (anthill[1] + 10)
             total_dist = abs(dist_x) + abs(dist_y)
 
             if checkAnthill(self.loc[0], self.loc[1]) or total_dist == 0:
@@ -180,7 +173,7 @@ def checkFood(x, y):
 
 
 def checkAnthill(x, y):
-    if x > (anthill[0] + 5) and x < (anthill[0] + 15) and y > (anthill[1] + 5) and y < (anthill[1] + 15):
+    if x > (anthill[0] + 2) and x < (anthill[0] + 18) and y > (anthill[1] + 2) and y < (anthill[1] + 18):
         return 1
     return 0;
 
