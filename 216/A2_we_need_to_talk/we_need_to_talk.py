@@ -7,6 +7,7 @@ class Talker:
     def __init__(self, ip, port, sock):
         self.addr = (ip, port)
         self.sock = sock
+        self.val = -1
 
     def restart(self):
         self.timeout_clock = time.time()
@@ -20,7 +21,8 @@ class Talker:
         self.active = 1
 
     def setVal(self, val):
-        self.val = val
+        if val.isdigit():
+            self.val = int(val)
 
     def errorState(self):
         self.active = 0
@@ -43,7 +45,7 @@ class Listener:
         # 1: working
         # 2: error
         self.state = 0
-        self.thresholds = [50, 200, 400]
+        self.thresholds = [2000, 3000, 4000]
         
         # establish UDP connection
         self.in_port = in_port
@@ -68,9 +70,9 @@ class Listener:
         except TimeoutError:
             return
         
-        data = data.decode()
+        data = data.decode().replace('\00', '')
         addr = addr[0]
-        print("received data:", data, "from", addr)
+        #print("received data:", data, "from", addr)
         # if this is the first message we've received from this ESP, track it
         if self.esps[addr].active == 0:
             self.esps_connected += 1
@@ -81,13 +83,17 @@ class Listener:
         # we got a new message, so reset the clock for this ESP
         self.esps[addr].resetTimeout()
         self.esps[addr].setVal(data)
-        #return data
+        return data
 
     def process(self):
         avg = 0
         for esp in self.esps:
-            avg += self.esps[esp].val
+            v = self.esps[esp].val
+            if v != -1:
+                avg += v
+                print(v, " ", end="")
         avg /= len(self.esps)
+        print(f"\navg: {avg:0.2f}")
 
         for i, t in enumerate(self.thresholds):
             if avg >= t:
@@ -98,9 +104,11 @@ class Listener:
     def errorInput(self):
         try:
             (data, addr) = self.sock.recvfrom(8)
+            data = data.decode().replace('\00', '')
         except TimeoutError:
             return
-        if addr == self.error_esp and data == "SORRY":
+        if addr[0] == self.error_esp and data == "SORRY":
+            print("received apology; returning to pre-INIT state")
             self.error_esp = -1
             self.state = 0
             self.setErrorLED(1)
@@ -121,6 +129,9 @@ class Listener:
                 self.esps[esp].sendMsg(b"STOP")
             print("STOP")
             self.state = 0
+            for led in self.indicator_leds:
+                led.off()
+            self.setErrorLED(1)
 
     def update(self):
         if self.state == 1:
@@ -133,6 +144,8 @@ class Listener:
                     self.error_clock = curr_time
                     self.error_esp = esp
                     print("ERROR: have not received message from", esp)
+                    for led in self.indicator_leds:
+                        led.off()
                     # surely there's a better way to do this, but whatever
                     for esp1 in self.esps:
                         if esp1 == self.error_esp:
@@ -177,7 +190,14 @@ UDP_IP = s1.getsockname()[0]
 print(UDP_IP)
 s1.close
 
-l = Listener(UDP_IP, 6666, 6667, 21, [23, 24, 25], 8, ["192.168.1.30"])
+in_port = 6666
+out_port = 6667
+btn_pin = 21
+leds = [23, 24, 25]
+error_led = 12
+esp_ips = ["172.31.206.163", "172.31.188.64", "172.31.184.255"]
+
+l = Listener(UDP_IP, in_port, out_port, btn_pin, leds, error_led, esp_ips)
 
 while True:
     l.update()
