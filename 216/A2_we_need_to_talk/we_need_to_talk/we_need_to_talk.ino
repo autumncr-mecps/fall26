@@ -46,6 +46,8 @@ void setup() {
   
   udp.begin(port_in);
 
+  pinMode(LED_BUILTIN, OUTPUT);
+
   Serial.println("Waiting for INIT");
 }
 
