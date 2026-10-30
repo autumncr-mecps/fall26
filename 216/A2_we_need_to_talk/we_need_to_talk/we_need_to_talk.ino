@@ -1,17 +1,17 @@
 #include <WiFi.h>
 #include <WiFiUdp.h>
 
-/*
+
 const char *ssid = "UCInet Mobile Access";
 const char *pwd = "";
-*/
 
-const char *ssid = "KittenLAN";
+/*
+const char *ssid = "Autumn";
 const char *pwd = "kittens_r_c00l";
-
+*/
 const int port_in = 6667;
 const int port_out = 6666;
-const char* addr = "192.168.1.172";
+const char* addr = "172.31.148.81";
 
 WiFiUDP udp;
 
@@ -47,11 +47,19 @@ void setup() {
   udp.begin(port_in);
 
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(0, INPUT);
 
   Serial.println("Waiting for INIT");
 }
 
 void loop() {
+  int btn_val = digitalRead(0);
+  if (btn_val == 0) {
+    state = 0;
+    Serial.println("stopped sending messages - to test timeout");
+    led_val = 0;
+    digitalWrite(LED_BUILTIN, led_val);
+  }
   input();
   process();
 }
@@ -82,6 +90,7 @@ void input() {
       udp.endPacket();
       state = 0;
     }
+    memset(in_buf, 0, sizeof(in_buf));
   }
 }
 
