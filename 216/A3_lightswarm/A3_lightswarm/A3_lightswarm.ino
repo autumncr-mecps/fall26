@@ -5,16 +5,15 @@ SwitchDoc Labs, August 2015
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <Wire.h>
-#include "Adafruit_TCS34725.h"
 #undef DEBUG
 
-char ssid[] = "yyyyyy"; //  your network SSID (name)
-char pass[] = "xxxxxx"; // your network password
+char ssid[] = "KittenLAN"; //  your network SSID (name)
+char pass[] = "kittens_r_c00l"; // your network password
 
 #define VERSIONNUMBER 28
 
 #define LOGGERIPINC 20
-#define SWARMSIZE 5
+#define SWARMSIZE 3
 // 30 seconds is too old - it must be dead
 #define SWARMTOOOLD 30000
 
@@ -30,6 +29,16 @@ int mySwarmID = 0;
 #define MASTER_CHANGE_PACKET 6
 #define BLINK_BRIGHT_LED 7
 
+#define PHOTOR 36 // pin 36 for the photoresistor
+#define MASTER_LED 15
+int light_val;
+int blink_speed = 10000;
+bool blink_val = false;
+unsigned long blink_clock;
+unsigned long packet_clock;
+int packet_timeout = 2000;
+int long_packet_timeout = 2020;
+
 unsigned int localPort = 2910; // local port to listen for UDP packets
 
 // master variables
@@ -43,25 +52,13 @@ IPAddress serverAddress = IPAddress(0, 0, 0, 0); // default no IP Address
 
 int swarmAddresses[SWARMSIZE]; // Swarm addresses
 
-// variables for light sensor
-int clearColor;
-int redColor;
-int blueColor;
-int greenColor;
-
-const int PACKET_SIZE = 14; // Light Update Packet
+const int PACKET_SIZE = 8; // Light Update Packet
 const int BUFFERSIZE = 1024;
 
 byte packetBuffer[BUFFERSIZE]; //buffer to hold incoming and outgoing packets
 
 // A UDP instance to let us send and receive packets over UDP
 WiFiUDP udp;
-
-/* Initialise with default values (int time = 2.4ms, gain = 1x) */
-// Adafruit_TCS34725 tcs = Adafruit_TCS34725();
-
-/* Initialise with specific int time and gain values */
-Adafruit_TCS34725 tcs = Adafruit_TCS34725(TCS34725_INTEGRATIONTIME_614MS, TCS34725_GAIN_1X);
 
 IPAddress localIP;
 
@@ -83,25 +80,15 @@ void setup() {
   Serial.print(F(" "));
   Serial.println(F(__DATE__));
   Serial.println();
-  pinMode(0, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(MASTER_LED, OUTPUT);
+  pinMode(PHOTOR, INPUT);
+  blink_clock = millis();
+  digitalWrite(MASTER_LED, HIGH); // every swarm member assumes they're the master at first
 
-  digitalWrite(0, LOW);
-  delay(500);
-  digitalWrite(0, HIGH);
-
-  randomSeed(analogRead(A0));
-  Serial.print("analogRead(A0)=");
-  Serial.println(analogRead(A0));
-
-  if (tcs.begin()) {
-    Serial.println("Found sensor");
-  } else {
-    Serial.println("No TCS34725 found ... check your connections");
-
-  }
-
-  // turn off the light
-  tcs.setInterrupt(true); // true means off, false means on
+  randomSeed(analogRead(39));
+  Serial.print("analogRead(39)=");
+  Serial.println(analogRead(39));
 
   // everybody starts at 0 and changes from there
   mySwarmID = 0;
@@ -140,80 +127,42 @@ void setup() {
   }
   swarmClear[mySwarmID] = 0;
   swarmTimeStamp[mySwarmID] = 1; // I am always in time to myself
-  clearColor = swarmClear[mySwarmID];
+  light_val = swarmClear[mySwarmID];
   swarmVersion[mySwarmID] = VERSIONNUMBER;
   swarmState[mySwarmID] = masterState;
-  Serial.print("clearColor =");
-  Serial.println(clearColor);
+  Serial.print("light_val = ");
+  Serial.println(light_val);
 
   // set SwarmID based on IP address 
-
   localIP = WiFi.localIP();
-
   swarmAddresses[0] = localIP[3];
-
   mySwarmID = 0;
-
-  Serial.print("MySwarmID=");
+  Serial.print("MySwarmID = ");
   Serial.println(mySwarmID);
 }
 
 void loop() {
   int secondsCount;
-  int lastSecondsCount;
-
-  lastSecondsCount = 0;
+  int lastSecondsCount = 0;
   #define LOGHOWOFTEN
-
   secondsCount = millis() / 100;
 
-  uint16_t r, g, b, c, colorTemp, lux;
-
-  tcs.getRawData( & r, & g, & b, & c);
-  colorTemp = tcs.calculateColorTemperature(r, g, b);
-  lux = tcs.calculateLux(r, g, b);
-
-  Serial.print("Color Temp: ");
-  Serial.print(colorTemp, DEC);
-  Serial.print(" K - ");
-  Serial.print("Lux: ");
-  Serial.print(lux, DEC);
-  Serial.print(" - ");
-  Serial.print("R: ");
-  Serial.print(r, DEC);
-  Serial.print(" ");
-  Serial.print("G: ");
-  Serial.print(g, DEC);
-  Serial.print(" ");
-  Serial.print("B: ");
-  Serial.print(b, DEC);
-  Serial.print(" ");
-  Serial.print("C: ");
-  Serial.print(c, DEC);
-  Serial.print(" ");
-  Serial.println(" ");
-
-  clearColor = c;
-  redColor = r;
-  blueColor = b;
-  greenColor = g;
-
-  swarmClear[mySwarmID] = clearColor;
+  light_val = analogRead(PHOTOR);
+  swarmClear[mySwarmID] = light_val;
+  blink(light_val);
 
   // wait to see if a reply is available
-  delay(300);
-
   int cb = udp.parsePacket();
-
   if (!cb) {
     //  Serial.println("no packet yet");
-    Serial.print(".");
+    //Serial.print(".");
   } else {
     // We've received a packet, read the data from it
     udp.read(packetBuffer, PACKET_SIZE); // read the packet into the buffer
     Serial.print("packetbuffer[1] =");
     Serial.println(packetBuffer[1]);
     if (packetBuffer[1] == LIGHT_UPDATE_PACKET) {
+      packet_clock = millis();
       Serial.print("LIGHT_UPDATE_PACKET received from LightSwarm #");
       Serial.println(packetBuffer[2]);
       setAndReturnMySwarmIndex(packetBuffer[2]);
@@ -221,10 +170,12 @@ void loop() {
       Serial.print("LS Packet Recieved from #");
       Serial.print(packetBuffer[2]);
       Serial.print(" SwarmState:");
-      if (packetBuffer[3] == 0)
+      if (packetBuffer[3] == 0) {
         Serial.print("SLAVE");
-      else
+      }
+      else {
         Serial.print("MASTER");
+      }
       Serial.print(" CC:");
       Serial.print(packetBuffer[5] * 256 + packetBuffer[6]);
       Serial.print(" RC:");
@@ -280,16 +231,13 @@ void loop() {
         masterState = true;
         Serial.println("Reset Me:  I just BECAME Master");
         digitalWrite(0, LOW);
-
       } 
       else {
         Serial.print("Wanted #");
         Serial.print(packetBuffer[2]);
         Serial.println(" Not me - reset ignored");
       }
-
     }
-
   }
 
   if (packetBuffer[1] == DEFINE_SERVER_LOGGER_PACKET) {
@@ -302,9 +250,9 @@ void loop() {
   if (packetBuffer[1] == BLINK_BRIGHT_LED) {
     Serial.println(">>>>>>>>>BLINK_BRIGHT_LED Packet Recieved");
     if (packetBuffer[2] == swarmAddresses[mySwarmID]) {
-      tcs.setInterrupt(false); // true means off, false means on
+      digitalWrite(LED_BUILTIN, HIGH);
       delay(packetBuffer[4] * 100);
-      tcs.setInterrupt(true); // true means off, false means on
+      digitalWrite(LED_BUILTIN, LOW);
     }
     else {
       Serial.print("Wanted #");
@@ -313,34 +261,7 @@ void loop() {
     }
   }
 
-  Serial.print("MasterStatus:");
-  if (masterState == true) {
-    digitalWrite(0, LOW);
-    Serial.print("MASTER");
-  } 
-  else {
-    digitalWrite(0, HIGH);
-    Serial.print("SLAVE");
-  }
-  Serial.print("/cc=");
-  Serial.print(clearColor);
-  Serial.print("/KS:");
-  Serial.println(serverAddress);
-
-  Serial.println("--------");
-
-  int i;
-  for (i = 0; i < SWARMSIZE; i++) {
-    Serial.print("swarmAddress[");
-    Serial.print(i);
-    Serial.print("] = ");
-    Serial.println(swarmAddresses[i]);
-  }
-  Serial.println("--------");
-
   broadcastARandomUpdatePacket();
-  //  sendARandomUpdatePacket();
-  sendLogToServer();
 }
 
 // send an LIGHT Packet request to the swarms at the given address
@@ -357,15 +278,9 @@ unsigned long sendLightUpdatePacket(IPAddress & address) {
   packetBuffer[2] = localIP[3]; // Sending Swarm Number
   packetBuffer[3] = masterState; // 0 = slave, 1 = master
   packetBuffer[4] = VERSIONNUMBER; // Software Version
-  packetBuffer[5] = (clearColor & 0xFF00) >> 8; // Clear High Byte
-  packetBuffer[6] = (clearColor & 0x00FF); // Clear Low Byte
-  packetBuffer[7] = (redColor & 0xFF00) >> 8; // Red High Byte
-  packetBuffer[8] = (redColor & 0x00FF); // Red Low Byte
-  packetBuffer[9] = (greenColor & 0xFF00) >> 8; // green High Byte
-  packetBuffer[10] = (greenColor & 0x00FF); // green Low Byte
-  packetBuffer[11] = (blueColor & 0xFF00) >> 8; // blue High Byte
-  packetBuffer[12] = (blueColor & 0x00FF); // blue Low Byte
-  packetBuffer[13] = 0x0F; //End Byte
+  packetBuffer[5] = (light_val & 0xFF00) >> 8; // Clear High Byte
+  packetBuffer[6] = (light_val & 0x00FF); // Clear Low Byte
+  packetBuffer[7] = 0x0F; //End Byte
 
   // all Light Packet fields have been given values, now
   // you can send a packet requesting coordination
@@ -375,25 +290,64 @@ unsigned long sendLightUpdatePacket(IPAddress & address) {
   udp.endPacket();
 }
 
-// delay 0-MAXDELAY seconds
-#define MAXDELAY 500
 void broadcastARandomUpdatePacket() {
-  int sendToLightSwarm = 255;
-  Serial.print("Broadcast ToSwarm = ");
-  Serial.print(sendToLightSwarm);
-  Serial.print(" ");
+  /*
+   * First check if it's our "turn" to send a new packet.
+   * If it's been more than 200ms since we last received (or sent) a packet, 
+   * iterate over the timestamps for the rest of the swarm; if one of them is
+   * earlier than ours, it should be that one's "turn", and we'll wait a little
+   * longer to hear from it before we decide to send ours
+   */
+  bool my_turn = false;
+  if (millis() - packet_clock > packet_timeout) {
+    my_turn = true;
+    for (int i = 1; i < SWARMSIZE; i++) {
+      // mySwarmID is always 0
+      if (swarmTimeStamp[i] < swarmTimeStamp[mySwarmID]) {
+        my_turn = false;
+      }
+    }
+  }
 
-  // delay 0-MAXDELAY seconds
-  int randomDelay;
-  randomDelay = random(0, MAXDELAY);
-  Serial.print("Delay = ");
-  Serial.print(randomDelay);
-  Serial.print("ms : ");
+  /*
+   * If it's my turn OR we've waited a few more ms for an expected packet and
+   * still haven't received one, it's time to send ours
+   */
+  if (my_turn || (millis() - packet_clock) > long_packet_timeout) {
+    Serial.print("SENDING PACKET. MasterStatus:");
+    if (masterState == true) {
+      Serial.print("MASTER");
+    } 
+    else {
+      Serial.print("SLAVE");
+    }
+    Serial.print("/cc=");
+    Serial.print(light_val);
+    Serial.print("/KS:");
+    Serial.println(serverAddress);
 
-  delay(randomDelay);
+    Serial.println("--------");
 
-  IPAddress sendSwarmAddress(192, 168, 1, sendToLightSwarm); // my Swarm Address
-  sendLightUpdatePacket(sendSwarmAddress);
+    int i;
+    for (i = 0; i < SWARMSIZE; i++) {
+      Serial.print("swarmAddress[");
+      Serial.print(i);
+      Serial.print("] = ");
+      Serial.println(swarmAddresses[i]);
+    }
+    Serial.println("--------");
+
+    packet_clock = millis();
+    swarmTimeStamp[mySwarmID] = packet_clock;
+    int sendToLightSwarm = 255;
+    Serial.print("Broadcast To Swarm = ");
+    Serial.print(sendToLightSwarm);
+    Serial.println(" ");
+
+    IPAddress sendSwarmAddress(192, 168, 1, sendToLightSwarm); // my Swarm Address
+    //sendLightUpdatePacket(sendSwarmAddress);
+    //sendLogToServer();
+  }
 }
 
 void checkAndSetIfMaster() {
@@ -453,14 +407,14 @@ void checkAndSetIfMaster() {
   if (setMaster == true) {
     if (masterState == false) {
       Serial.println("I just BECAME Master");
-      digitalWrite(0, LOW);
+      digitalWrite(MASTER_LED, HIGH);
     }
     masterState = true;
   }
   else {
     if (masterState == true) {
       Serial.println("I just LOST Master");
-      digitalWrite(0, HIGH);
+      digitalWrite(MASTER_LED, LOW);
     }
     masterState = false;
   }
@@ -518,7 +472,7 @@ void sendLogToServer() {
     }
     else {
       // now send the packet as a string with the following format:
-      // swarmID, MasterSlave, SoftwareVersion, clearColor, Status | ....next Swarm ID
+      // swarmID, MasterSlave, SoftwareVersion, light_val, Status | ....next Swarm ID
       // 0,1,15,3883, PR | 1,0,14,399, PR | ....
       int i;
       char swarmString[20];
@@ -568,5 +522,14 @@ void sendLogToServer() {
     udp.beginPacket(serverAddress, localPort); //
     udp.write(packetBuffer, packetLength);
     udp.endPacket();
+  }
+}
+
+void blink(int light_val) {
+  blink_speed = map(light_val, 0, 4096, 2000, 50);
+  if (millis() - blink_clock >= blink_speed) {
+    blink_val = !blink_val;
+    digitalWrite(LED_BUILTIN, blink_val);
+    blink_clock = millis();
   }
 }
