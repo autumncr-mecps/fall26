@@ -11,6 +11,7 @@ from builtins import range
 import sys  
 import time 
 import random
+from os import path
 
 from netifaces import interfaces, ifaddresses, AF_INET
 
@@ -29,21 +30,22 @@ BLINK_BRIGHT_LED = 7
 
 MYPORT = 2910
 
-SWARMSIZE = 5
+SWARMSIZE = 3
 
 
 logString = ""
 # command from command Code
+path = path.dirname(__file__)
 
 def completeCommand():
 
-        f = open("/home/pi/SDL_Pi_LightSwarm/state/LSCommand.txt", "w")
+        f = open(path + "/state/LSCommand.txt", "w")
         f.write("DONE")
         f.close()
 
 def completeCommandWithValue(value):
 
-        f = open("/home/pi/SDL_Pi_LightSwarm/state/LSResponse.txt", "w")
+        f = open(path + "/state/LSResponse.txt", "w")
         f.write(value)
         print("in completeCommandWithValue=", value)
         f.close()
@@ -52,7 +54,7 @@ def completeCommandWithValue(value):
 
 
 def processCommand(s):
-        f = open("//home/pi/SDL_Pi_LightSwarm/state/LSCommand.txt", "r")
+        f = open(path + "/state/LSCommand.txt", "r")
         command = f.read()
         f.close()
 
@@ -335,15 +337,15 @@ def buildWebMapToFile(logString, swarmSize ):
 
 
 
-    f = open("/home/pi/SDL_Pi_LightSwarm/state/figure.html", "w")
+    f = open(path + "/state/figure.html", "w")
 
     f.write(webresponse)
 
     f.close()
 
-    f = open("/home/pi/SDL_Pi_LightSwarm/state/swarm.html", "w")
-    fh = open("/home/pi/SDL_Pi_LightSwarm/state/swarmheader.txt", "r")
-    ff = open("/home/pi/SDL_Pi_LightSwarm/state/swarmfooter.txt", "r")
+    f = open(path + "/state/swarm.html", "w")
+    fh = open(path + "/state/swarmheader.txt", "r")
+    ff = open(path + "/state/swarmfooter.txt", "r")
 
     webheader = fh.read()
     webfooter = ff.read()
