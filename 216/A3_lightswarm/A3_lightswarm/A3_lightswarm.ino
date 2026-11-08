@@ -36,10 +36,12 @@ int blink_speed = 10000;
 bool blink_val = false;
 unsigned long blink_clock;
 unsigned long packet_clock;
-int packet_timeout = 2000;
-int long_packet_timeout = 2020;
+unsigned long master_clock;
+int packet_timeout = 200;
+int long_packet_timeout = 220;
 
-unsigned int localPort = 2910; // local port to listen for UDP packets
+unsigned int localPort = 2911; // local port to listen for UDP packets
+unsigned int serverPort = 2910;
 
 // master variables
 boolean masterState = true; // True if master, False if not
@@ -48,11 +50,11 @@ int swarmVersion[SWARMSIZE];
 int swarmState[SWARMSIZE];
 long swarmTimeStamp[SWARMSIZE]; // for aging
 
-IPAddress serverAddress = IPAddress(0, 0, 0, 0); // default no IP Address
+IPAddress serverAddress = IPAddress(192, 168, 1, 69); // default no IP Address
 
 int swarmAddresses[SWARMSIZE]; // Swarm addresses
 
-const int PACKET_SIZE = 8; // Light Update Packet
+const int PACKET_SIZE = 9; // Light Update Packet
 const int BUFFERSIZE = 1024;
 
 byte packetBuffer[BUFFERSIZE]; //buffer to hold incoming and outgoing packets
@@ -84,6 +86,7 @@ void setup() {
   pinMode(MASTER_LED, OUTPUT);
   pinMode(PHOTOR, INPUT);
   blink_clock = millis();
+  master_clock = millis();
   digitalWrite(MASTER_LED, HIGH); // every swarm member assumes they're the master at first
 
   randomSeed(analogRead(39));
@@ -117,6 +120,8 @@ void setup() {
   udp.begin(localPort);
   Serial.print("Local port: ");
   Serial.println(localPort);
+  Serial.print("Server port: ");
+  Serial.println(serverPort);
 
   // initialize light sensor and arrays
   int i;
@@ -178,12 +183,6 @@ void loop() {
       }
       Serial.print(" CC:");
       Serial.print(packetBuffer[5] * 256 + packetBuffer[6]);
-      Serial.print(" RC:");
-      Serial.print(packetBuffer[7] * 256 + packetBuffer[8]);
-      Serial.print(" GC:");
-      Serial.print(packetBuffer[9] * 256 + packetBuffer[10]);
-      Serial.print(" BC:");
-      Serial.print(packetBuffer[11] * 256 + packetBuffer[12]);
       Serial.print(" Version=");
       Serial.println(packetBuffer[4]);
 
@@ -261,13 +260,18 @@ void loop() {
     }
   }
 
+  if (masterState == true && millis() - master_clock >= 200) {
+    sendLogToServer();
+    master_clock = millis();
+  }
+
   broadcastARandomUpdatePacket();
 }
 
 // send an LIGHT Packet request to the swarms at the given address
-unsigned long sendLightUpdatePacket(IPAddress & address) {
-  // Serial.print("sending Light Update packet to:");
-  // Serial.println(address);
+void sendLightUpdatePacket(IPAddress &address) {
+  //Serial.print("sending Light Update packet to:");
+  //Serial.println(address);
 
   // set all bytes in the buffer to 0
   memset(packetBuffer, 0, PACKET_SIZE);
@@ -284,8 +288,7 @@ unsigned long sendLightUpdatePacket(IPAddress & address) {
 
   // all Light Packet fields have been given values, now
   // you can send a packet requesting coordination
-  udp.beginMulticast(address, localPort); //
-  //udp.beginPacket(address,  localPort); //
+  udp.beginPacket(address,  localPort); //
   udp.write(packetBuffer, PACKET_SIZE);
   udp.endPacket();
 }
@@ -345,8 +348,7 @@ void broadcastARandomUpdatePacket() {
     Serial.println(" ");
 
     IPAddress sendSwarmAddress(192, 168, 1, sendToLightSwarm); // my Swarm Address
-    //sendLightUpdatePacket(sendSwarmAddress);
-    //sendLogToServer();
+    sendLightUpdatePacket(sendSwarmAddress);
   }
 }
 
@@ -519,7 +521,7 @@ void sendLogToServer() {
     int packetLength;
     packetLength = i + 5 + 1;
 
-    udp.beginPacket(serverAddress, localPort); //
+    udp.beginPacket(serverAddress, serverPort); //
     udp.write(packetBuffer, packetLength);
     udp.endPacket();
   }

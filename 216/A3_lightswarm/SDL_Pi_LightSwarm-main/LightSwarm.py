@@ -12,6 +12,7 @@ import sys
 import time 
 import random
 from os import path
+from gpiozero import LED, Button
 
 from netifaces import interfaces, ifaddresses, AF_INET
 
@@ -29,9 +30,14 @@ MASTER_CHANGE_PACKET = 6
 BLINK_BRIGHT_LED = 7
 
 MYPORT = 2910
+SWARMPORT = 2911
 
 SWARMSIZE = 3
 
+# GPIO outputs
+reset_button = Button(4)
+swarm_led = (LED(16), LED(20), LED(21))
+white_led = LED(12)
 
 logString = ""
 # command from command Code
@@ -51,7 +57,6 @@ def completeCommandWithValue(value):
         f.close()
 
         completeCommand()
-
 
 def processCommand(s):
         f = open(path + "/state/LSCommand.txt", "r")
@@ -108,9 +113,7 @@ def processCommand(s):
         completeCommand()
 			
 
-
         return False
-
 
 # UDP Commands and packets
 
@@ -145,8 +148,8 @@ def SendDEFINE_SERVER_LOGGER_PACKET(s):
     data[12] = int(0x00).to_bytes(1,'little')
     data[13] = int(0x0F).to_bytes(1,'little')
     mymessage = ''.encode()  	
-    s.sendto(mymessage.join(data), ('<broadcast>'.encode(), MYPORT))
-	
+    s.sendto(mymessage.join(data), ('<broadcast>'.encode(), SWARMPORT))
+
 def SendRESET_SWARM_PACKET(s):
     print("RESET_SWARM_PACKET Sent") 
     s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
@@ -170,8 +173,16 @@ def SendRESET_SWARM_PACKET(s):
     data[13] = int(0x0F).to_bytes(1,'little')
       	
     mymessage = ''.encode()  	
-    s.sendto(mymessage.join(data), ('<broadcast>'.encode(), MYPORT))
-	
+    s.sendto(mymessage.join(data), ('<broadcast>'.encode(), SWARMPORT))
+    
+    # Once we've sent the reset instruction, turn the LED on and sleep for
+    # three seconds (to give swarm time to reset)
+    white_led.on()
+    time.sleep(3)
+    white_led.off()
+
+reset_button.when_pressed = SendRESET_SWARM_PACKET
+
 def SendRESET_ME_PACKET(s, swarmID):
     print("RESET_ME_PACKET Sent") 
     s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
@@ -195,8 +206,7 @@ def SendRESET_ME_PACKET(s, swarmID):
     data[13] = int(0x0F).to_bytes(1,'little')
       	
     mymessage = ''.encode()  	
-    s.sendto(mymessage.join(data), ('<broadcast>'.encode(), MYPORT))
-
+    s.sendto(mymessage.join(data), ('<broadcast>'.encode(), SWARMPORT))
 
 def SendCHANGE_TEST_PACKET(s, swarmID):
     print("RESET_ME_PACKET Sent") 
@@ -222,7 +232,7 @@ def SendCHANGE_TEST_PACKET(s, swarmID):
     data[13] = int(0x0F).to_bytes(1,'little')
       	
     mymessage = ''.encode()  	
-    s.sendto(mymessage.join(data), ('<broadcast>'.encode(), MYPORT))
+    s.sendto(mymessage.join(data), ('<broadcast>'.encode(), SWARMPORT))
 	
 
 def SendBLINK_BRIGHT_LED(s, swarmID, seconds):
@@ -253,7 +263,7 @@ def SendBLINK_BRIGHT_LED(s, swarmID, seconds):
     data[13] = int(0x0F).to_bytes(1,'little')
       	
     mymessage = ''.encode()  	
-    s.sendto(mymessage.join(data), ('<broadcast>'.encode(), MYPORT))
+    s.sendto(mymessage.join(data), ('<broadcast>'.encode(), SWARMPORT))
     
 	
 
@@ -271,15 +281,8 @@ def parseLogPacket(message):
 	#print("logString:", logString)	
 	return logString	
 
-
-
 # build Webmap
-
-
 def buildWebMapToFile(logString, swarmSize ):
-
-
-
     webresponse = ""
 
     swarmList = logString.split("|")
@@ -334,9 +337,6 @@ def buildWebMapToFile(logString, swarmSize ):
         webresponse += "</figcaption>"
 			
         webresponse += "</figure>"
-
-
-
     f = open(path + "/state/figure.html", "w")
 
     f.write(webresponse)
@@ -358,35 +358,26 @@ def buildWebMapToFile(logString, swarmSize ):
     fh.close
     ff.close
 
-
-def setAndReturnSwarmID(incomingID):
- 
-  
+def setAndReturnSwarmID(incomingID): 
     for i in range(0,SWARMSIZE):
         if (swarmStatus[i][5] == incomingID):
             return i
         else:
             if (swarmStatus[i][5] == 0):  # not in the system, so put it in
-    
                 swarmStatus[i][5] = incomingID;
                 print("incomingID %d " % incomingID)
                 print("assigned #%d" % i)
                 return i
     
-  
     # if we get here, then we have a new swarm member.   
     # Delete the oldest swarm member and add the new one in 
     # (this will probably be the one that dropped out)
-  
     oldTime = time.time();
     oldSwarmID = 0
     for i in range(0,SWARMSIZE):
         if (oldTime > swarmStatus[i][1]):
             ldTime = swarmStatus[i][1]
             oldSwarmID = i
-  		
- 
- 
 
     # remove the old one and put this one in....
     swarmStatus[oldSwarmID][5] = incomingID;
@@ -394,10 +385,11 @@ def setAndReturnSwarmID(incomingID):
     print("oldSwarmID %i" % oldSwarmID)
  
     return oldSwarmID 
-  
+
+def displayLightStatus(message):
+    print(message)
 
 # set up sockets for UDP
-
 s=socket(AF_INET, SOCK_DGRAM)
 host = 'localhost';
 s.bind(('',MYPORT))
@@ -407,15 +399,10 @@ print("LightSwarm Logger")
 print("Version ", VERSIONNUMBER)
 print("--------------")
 
- 
 # first send out DEFINE_SERVER_LOGGER_PACKET to tell swarm where to send logging information 
-
 SendDEFINE_SERVER_LOGGER_PACKET(s)
 time.sleep(3)
 SendDEFINE_SERVER_LOGGER_PACKET(s)
-
-
-
 # swarmStatus
 swarmStatus = [[0 for x  in range(6)] for x in range(SWARMSIZE)]
 
@@ -427,12 +414,9 @@ swarmStatus = [[0 for x  in range(6)] for x in range(SWARMSIZE)]
 # 3 - Current Test Item - 0 - CC 1 - Lux 2 - Red 3 - Green  4 - Blue
 # 4 - Current Test Direction  0 >=   1 <=
 # 5 - IP Address of Swarm
-
-
 for i in range(0,SWARMSIZE):
 	swarmStatus[i][0] = "NP"
 	swarmStatus[i][5] = 0
-
 
 #300 seconds round
 seconds_300_round = time.time() + 300.0
@@ -441,12 +425,7 @@ seconds_300_round = time.time() + 300.0
 seconds_120_round = time.time() + 120.0
 
 completeCommand() 
-
-
-
 while(1) :
-     
-         
     # receive datclient (data, addr)
     d = s.recvfrom(1024)
 
@@ -454,12 +433,11 @@ while(1) :
     addr = d[1]
 
     if (len(message) == 14):
-
-
         if (message[1] == LIGHT_UPDATE_PACKET):
             incomingSwarmID = setAndReturnSwarmID((message[2]))
             swarmStatus[incomingSwarmID][0] = "P"
-            swarmStatus[incomingSwarmID][1] = time.time()  
+            swarmStatus[incomingSwarmID][1] = time.time() 
+            displayLightStatus(message)
             #print("in LIGHT_UPDATE_PACKET")
 		         	
         if ((message[1]) == RESET_SWARM_PACKET):
@@ -495,13 +473,6 @@ while(1) :
 
         else:
             print("error message length = ",len(message))
-         
-    if (time.time() >  seconds_120_round):
-        # do our 2 minute round
-        print(">>>>doing 120 second task")
-        sendTo = random.randint(0,SWARMSIZE-1)
-        SendBLINK_BRIGHT_LED(s, sendTo, 1)
-        seconds_120_round = time.time() + 120.0	
 
     if (time.time() >  seconds_300_round):
         # do our 2 minute round
@@ -510,5 +481,4 @@ while(1) :
         seconds_300_round = time.time() + 300.0	
 
     processCommand(s)
-   
     #print swarmStatus 
