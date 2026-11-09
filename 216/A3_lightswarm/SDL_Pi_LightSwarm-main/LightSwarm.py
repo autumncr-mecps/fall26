@@ -32,6 +32,7 @@ SWARMSIZE = 3
 # GPIO outputs
 reset_button = Button(4)
 swarm_led = (LED(16), LED(20), LED(21))
+swarm_ips = []
 white_led = LED(12)
 master = -1
 blink_speed = float('inf')
@@ -54,7 +55,7 @@ def SendDEFINE_SERVER_LOGGER_PACKET(s):
     print(addresses)
     myIP = addresses[0].split('.')
     print(myIP) 
-    data= ["" for i in range(14)]
+    data= ["" for i in range(8)]
 
     data[0] = int("F0", 16).to_bytes(1,'little') 
     data[1] = int(DEFINE_SERVER_LOGGER_PACKET).to_bytes(1,'little')
@@ -64,12 +65,6 @@ def SendDEFINE_SERVER_LOGGER_PACKET(s):
     data[5] = int(myIP[1]).to_bytes(1,'little') # 2 octet of ip
     data[6] = int(myIP[2]).to_bytes(1,'little') # 3 octet of ip
     data[7] = int(myIP[3]).to_bytes(1,'little') # 4 octet of ip
-    data[8] = int(0x00).to_bytes(1,'little')
-    data[9] = int(0x00).to_bytes(1,'little')
-    data[10] = int(0x00).to_bytes(1,'little')
-    data[11] = int(0x00).to_bytes(1,'little')
-    data[12] = int(0x00).to_bytes(1,'little')
-    data[13] = int(0x0F).to_bytes(1,'little')
     mymessage = ''.encode()  	
     s.sendto(mymessage.join(data), ('<broadcast>'.encode(), SWARMPORT))
 
@@ -77,10 +72,9 @@ def SendRESET_SWARM_PACKET(s):
     print("RESET_SWARM_PACKET Sent") 
     s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
-    data= ["" for i in range(14)]
+    data= ["" for i in range(8)]
 
     data[0] = int("F0", 16).to_bytes(1,'little')
-    
     data[1] = int(RESET_SWARM_PACKET).to_bytes(1,'little')
     data[2] = int("FF", 16).to_bytes(1,'little') # swarm id (FF means not part of swarm)
     data[3] = int(VERSIONNUMBER).to_bytes(1,'little')
@@ -88,12 +82,6 @@ def SendRESET_SWARM_PACKET(s):
     data[5] = int(0x00).to_bytes(1,'little')
     data[6] = int(0x00).to_bytes(1,'little')
     data[7] = int(0x00).to_bytes(1,'little')
-    data[8] = int(0x00).to_bytes(1,'little')
-    data[9] = int(0x00).to_bytes(1,'little')
-    data[10] = int(0x00).to_bytes(1,'little')
-    data[11] = int(0x00).to_bytes(1,'little')
-    data[12] = int(0x00).to_bytes(1,'little')
-    data[13] = int(0x0F).to_bytes(1,'little')
       	
     mymessage = ''.encode()  	
     s.sendto(mymessage.join(data), ('<broadcast>'.encode(), SWARMPORT))
@@ -130,14 +118,17 @@ def calcBlinkInfo(logString, swarmSize):
         if (swarmElement[4] == "PR"):
             light_val += int(swarmElement[3])
             swarm_count += 1
+
+            if swarmElement[5] not in swarm_ips:
+                swarm_ips.append(swarmElement[5])
+                print(f"found new IP: {swarmElement[5]}")
             if (swarmElement[1] == "1"):
-                master = i
+                master = swarm_ips.index(swarmElement[5])
 
     light_val /= swarm_count
     # should do the same thing as Arduino map(val, 0, 4096, 50, 2000)
     blink_speed = (((4096 - light_val) / 4096) * 1950) + 50
     blink_speed /= 1000
-    print(blink_speed)
     return (master, blink_speed)
 
 # set up sockets for UDP
@@ -202,7 +193,6 @@ while(1) :
 
     message = d[0]
     addr = d[1]
-
     if ((message[1]) == LOG_TO_SERVER_PACKET):
         print("Swarm LOG_TO_SERVER_PACKET Received")
 
