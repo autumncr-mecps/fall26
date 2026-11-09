@@ -125,7 +125,7 @@ def calcBlinkInfo(logString, swarmSize):
     for i in range(0,swarmSize):
         swarmElement = swarmList[i].split(",")
         if (swarmElement[4] == "PR"):
-            light_val += swarmElement[3]
+            light_val += int(swarmElement[3])
             if (swarmElement[1] == "1"):
                 master = i
 
