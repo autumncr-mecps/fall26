@@ -50,7 +50,7 @@ int swarmVersion[SWARMSIZE];
 int swarmState[SWARMSIZE];
 long swarmTimeStamp[SWARMSIZE]; // for aging
 
-IPAddress serverAddress = IPAddress(192, 168, 1, 69); // default no IP Address
+IPAddress serverAddress = IPAddress(0, 0, 0, 0); // default no IP Address
 
 int swarmAddresses[SWARMSIZE]; // Swarm addresses
 
@@ -200,7 +200,7 @@ void loop() {
       Serial.println(">>>>>>>>>RESET_SWARM_PACKETPacket Recieved");
       masterState = true;
       Serial.println("Reset Swarm:  I just BECAME Master (and everybody else!)");
-      digitalWrite(0, LOW);
+      digitalWrite(MASTER_LED, HIGH);
     }
 
     if (packetBuffer[1] == CHANGE_TEST_PACKET) {
