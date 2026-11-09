@@ -34,6 +34,7 @@ reset_button = Button(4)
 swarm_led = (LED(16), LED(20), LED(21))
 white_led = LED(12)
 master = -1
+blink_speed = float('inf')
 blink_clock = time.time()
 blink_led_val = False
 
@@ -103,7 +104,7 @@ def SendRESET_SWARM_PACKET(s):
     time.sleep(3)
     white_led.off()
 
-reset_button.when_pressed = SendRESET_SWARM_PACKET
+reset_button.when_pressed = lambda: SendRESET_SWARM_PACKET(s)
 
 def parseLogPacket(message):
 	print("Log From SwarmID:",(message[2]))
@@ -122,16 +123,21 @@ def calcBlinkInfo(logString, swarmSize):
     # find the master and the average light value across the swarm
     master = -1
     light_val = 0
+    swarm_count = 0
     for i in range(0,swarmSize):
         swarmElement = swarmList[i].split(",")
+        print(swarmElement)
         if (swarmElement[4] == "PR"):
             light_val += int(swarmElement[3])
+            swarm_count += 1
             if (swarmElement[1] == "1"):
                 master = i
 
-    light_val /= swarmSize
+    light_val /= swarm_count
     # should do the same thing as Arduino map(val, 0, 4096, 50, 2000)
     blink_speed = (((4096 - light_val) / 4096) * 1950) + 50
+    blink_speed /= 1000
+    print(blink_speed)
     return (master, blink_speed)
 
 # set up sockets for UDP
@@ -167,29 +173,9 @@ for i in range(0,SWARMSIZE):
 #300 seconds round
 seconds_300_round = time.time() + 300.0
 
-while(1) :
-    # receive datclient (data, addr)
-    #d = s.recvfrom(1024)
-    try:
-        d =  s.recvfrom(1024)
-    except TimeoutError:
-        break
-
-    message = d[0]
-    addr = d[1]
-
-    if ((message[1]) == LOG_TO_SERVER_PACKET):
-        print("Swarm LOG_TO_SERVER_PACKET Received")
-
-        # process the Log Packet
-        logString = parseLogPacket(message)
-        (master, blink_speed) = calcBlinkInfo(logString, SWARMSIZE)
-
-    else:
-        print("error message length = ",len(message))
-
+while(1) :  
     # blink the master's LED at a speed proportional to swarm brightness
-    if (time.time() - blink_clock >= blink_speed):
+    if (time.time() - blink_clock > blink_speed):
         for i in range(SWARMSIZE):
             # only the master blinks
             if i != master:
@@ -208,3 +194,21 @@ while(1) :
         print(">>>>doing 300 second task")
         SendDEFINE_SERVER_LOGGER_PACKET(s)
         seconds_300_round = time.time() + 300.0	
+
+    try:
+        d =  s.recvfrom(1024)
+    except TimeoutError:
+        continue
+
+    message = d[0]
+    addr = d[1]
+
+    if ((message[1]) == LOG_TO_SERVER_PACKET):
+        print("Swarm LOG_TO_SERVER_PACKET Received")
+
+        # process the Log Packet
+        logString = parseLogPacket(message)
+        (master, blink_speed) = calcBlinkInfo(logString, SWARMSIZE)
+
+    else:
+        print("error message length = ",len(message))
