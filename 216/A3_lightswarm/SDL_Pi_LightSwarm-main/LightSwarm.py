@@ -6,12 +6,8 @@
 from __future__ import print_function
  
 from builtins import chr
-from builtins import str
 from builtins import range
-import sys  
 import time 
-import random
-from os import path
 from gpiozero import LED, Button
 
 from netifaces import interfaces, ifaddresses, AF_INET
@@ -31,7 +27,6 @@ BLINK_BRIGHT_LED = 7
 
 MYPORT = 2910
 SWARMPORT = 2911
-
 SWARMSIZE = 3
 
 # GPIO outputs
@@ -43,7 +38,6 @@ blink_clock = time.time()
 blink_led_val = False
 
 logString = ""
-path = path.dirname(__file__)
 
 # UDP Commands and packets
 def SendDEFINE_SERVER_LOGGER_PACKET(s):
