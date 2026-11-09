@@ -7,19 +7,13 @@ SwitchDoc Labs, August 2015
 #include <Wire.h>
 #undef DEBUG
 
-char ssid[] = "KittenLAN"; //  your network SSID (name)
-char pass[] = "kittens_r_c00l"; // your network password
-
 #define VERSIONNUMBER 28
-
 #define LOGGERIPINC 20
 #define SWARMSIZE 3
 // 30 seconds is too old - it must be dead
 #define SWARMTOOOLD 30000
 
-int mySwarmID = 0;
 // Packet Types
-
 #define LIGHT_UPDATE_PACKET 0
 #define RESET_SWARM_PACKET 1
 #define CHANGE_TEST_PACKET 2
@@ -29,6 +23,9 @@ int mySwarmID = 0;
 #define MASTER_CHANGE_PACKET 6
 #define BLINK_BRIGHT_LED 7
 
+char ssid[] = "KittenLAN"; //  your network SSID (name)
+char pass[] = "kittens_r_c00l"; // your network password
+
 #define PHOTOR 36 // pin 36 for the photoresistor
 #define MASTER_LED 15
 int light_val;
@@ -37,13 +34,14 @@ bool blink_val = false;
 unsigned long blink_clock;
 unsigned long packet_clock;
 unsigned long master_clock;
-int packet_timeout = 200;
-int long_packet_timeout = 220;
+int packet_timeout = 2000;
+int long_packet_timeout = 2010;
 
 unsigned int localPort = 2911; // local port to listen for UDP packets
-unsigned int serverPort = 2910;
+unsigned int serverPort = 2910; // server's port
 
 // master variables
+int mySwarmID = 0;
 boolean masterState = true; // True if master, False if not
 int swarmClear[SWARMSIZE];
 int swarmVersion[SWARMSIZE];
@@ -51,17 +49,14 @@ int swarmState[SWARMSIZE];
 long swarmTimeStamp[SWARMSIZE]; // for aging
 
 IPAddress serverAddress = IPAddress(0, 0, 0, 0); // default no IP Address
-
 int swarmAddresses[SWARMSIZE]; // Swarm addresses
 
 const int PACKET_SIZE = 9; // Light Update Packet
 const int BUFFERSIZE = 1024;
-
 byte packetBuffer[BUFFERSIZE]; //buffer to hold incoming and outgoing packets
 
 // A UDP instance to let us send and receive packets over UDP
 WiFiUDP udp;
-
 IPAddress localIP;
 
 void setup() {

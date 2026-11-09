@@ -136,8 +136,9 @@ def calcBlinkInfo(logString, swarmSize):
 
 # set up sockets for UDP
 s=socket(AF_INET, SOCK_DGRAM)
-host = 'localhost';
+host = 'localhost'
 s.bind(('',MYPORT))
+s.settimeout(0.1)
 
 print("--------------")
 print("LightSwarm Logger")
@@ -168,7 +169,11 @@ seconds_300_round = time.time() + 300.0
 
 while(1) :
     # receive datclient (data, addr)
-    d = s.recvfrom(1024)
+    #d = s.recvfrom(1024)
+    try:
+        d =  s.recvfrom(1024)
+    except TimeoutError:
+        break
 
     message = d[0]
     addr = d[1]
