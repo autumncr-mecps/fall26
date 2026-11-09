@@ -34,8 +34,8 @@ bool blink_val = false;
 unsigned long blink_clock;
 unsigned long packet_clock;
 unsigned long master_clock;
-int packet_timeout = 2000;
-int long_packet_timeout = 2010;
+int packet_timeout = 200;
+int long_packet_timeout = 210;
 
 unsigned int localPort = 2911; // local port to listen for UDP packets
 unsigned int serverPort = 2910; // server's port
@@ -51,7 +51,7 @@ long swarmTimeStamp[SWARMSIZE]; // for aging
 IPAddress serverAddress = IPAddress(0, 0, 0, 0); // default no IP Address
 int swarmAddresses[SWARMSIZE]; // Swarm addresses
 
-const int PACKET_SIZE = 9; // Light Update Packet
+const int PACKET_SIZE = 8; // Light Update Packet
 const int BUFFERSIZE = 1024;
 byte packetBuffer[BUFFERSIZE]; //buffer to hold incoming and outgoing packets
 
