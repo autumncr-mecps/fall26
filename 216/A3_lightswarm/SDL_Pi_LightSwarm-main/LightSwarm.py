@@ -112,7 +112,6 @@ def SendRESET_SWARM_PACKET(s):
 reset_button.when_pressed = SendRESET_SWARM_PACKET
 
 def parseLogPacket(message):
-	incomingSwarmID = setAndReturnSwarmID((message[2]))
 	print("Log From SwarmID:",(message[2]))
 	print("Swarm Software Version:", (message[4]))
 	
@@ -140,34 +139,6 @@ def calcBlinkInfo(logString, swarmSize):
     # should do the same thing as Arduino map(val, 0, 4096, 50, 2000)
     blink_speed = (((4096 - light_val) / 4096) * 1950) + 50
     return (master, blink_speed)
-
-def setAndReturnSwarmID(incomingID): 
-    for i in range(0,SWARMSIZE):
-        if (swarmStatus[i][5] == incomingID):
-            return i
-        else:
-            if (swarmStatus[i][5] == 0):  # not in the system, so put it in
-                swarmStatus[i][5] = incomingID;
-                print("incomingID %d " % incomingID)
-                print("assigned #%d" % i)
-                return i
-    
-    # if we get here, then we have a new swarm member.   
-    # Delete the oldest swarm member and add the new one in 
-    # (this will probably be the one that dropped out)
-    oldTime = time.time();
-    oldSwarmID = 0
-    for i in range(0,SWARMSIZE):
-        if (oldTime > swarmStatus[i][1]):
-            ldTime = swarmStatus[i][1]
-            oldSwarmID = i
-
-    # remove the old one and put this one in....
-    swarmStatus[oldSwarmID][5] = incomingID;
-    # the rest will be filled in by Light Packet Receive
-    print("oldSwarmID %i" % oldSwarmID)
- 
-    return oldSwarmID 
 
 # set up sockets for UDP
 s=socket(AF_INET, SOCK_DGRAM)
@@ -201,9 +172,6 @@ for i in range(0,SWARMSIZE):
 #300 seconds round
 seconds_300_round = time.time() + 300.0
 
-#120 seconds round
-seconds_120_round = time.time() + 120.0
-
 while(1) :
     # receive datclient (data, addr)
     d = s.recvfrom(1024)
@@ -221,8 +189,10 @@ while(1) :
     else:
         print("error message length = ",len(message))
 
+    # blink the master's LED at a speed proportional to swarm brightness
     if (time.time() - blink_clock >= blink_speed):
         for i in range(SWARMSIZE):
+            # only the master blinks
             if i != master:
                 swarm_led[i].off()
             else:
@@ -236,9 +206,6 @@ while(1) :
         blink_clock = time.time()
 
     if (time.time() >  seconds_300_round):
-        # do our 2 minute round
         print(">>>>doing 300 second task")
         SendDEFINE_SERVER_LOGGER_PACKET(s)
         seconds_300_round = time.time() + 300.0	
-
-    #print swarmStatus 
