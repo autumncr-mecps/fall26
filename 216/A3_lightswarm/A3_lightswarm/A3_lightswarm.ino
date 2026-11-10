@@ -8,10 +8,9 @@ SwitchDoc Labs, August 2015
 #undef DEBUG
 
 #define VERSIONNUMBER 28
-#define LOGGERIPINC 20
 #define SWARMSIZE 3
-// 30 seconds is too old - it must be dead
-#define SWARMTOOOLD 30000
+// 10 seconds is too old - it must be dead
+#define SWARMTOOOLD 10000
 
 // Packet Types
 #define LIGHT_UPDATE_PACKET 0
@@ -29,7 +28,7 @@ char pass[] = "kittens_r_c00l"; // your network password
 #define PHOTOR 36 // pin 36 for the photoresistor
 #define MASTER_LED 15
 int light_val;
-int blink_speed = 10000;
+int blink_speed = INT_MAX;
 bool blink_val = false;
 unsigned long blink_clock;
 unsigned long packet_clock;
@@ -151,12 +150,8 @@ void loop() {
   swarmClear[mySwarmID] = light_val;
   blink(light_val);
 
-  // wait to see if a reply is available
   int cb = udp.parsePacket();
-  if (!cb) {
-    //  Serial.println("no packet yet");
-    //Serial.print(".");
-  } else {
+  if (cb) {
     // We've received a packet, read the data from it
     udp.read(packetBuffer, PACKET_SIZE); // read the packet into the buffer
     Serial.print("packetbuffer[1] =");
@@ -197,41 +192,6 @@ void loop() {
       Serial.println("Reset Swarm:  I just BECAME Master (and everybody else!)");
       digitalWrite(MASTER_LED, HIGH);
     }
-
-    if (packetBuffer[1] == CHANGE_TEST_PACKET) {
-      Serial.println(">>>>>>>>>CHANGE_TEST_PACKET Packet Received");
-      Serial.println("not implemented");
-      int i;
-      for (i = 0; i < PACKET_SIZE; i++) {
-        if (i == 2) {
-          Serial.print("LPS[");
-          Serial.print(i);
-          Serial.print("] = ");
-          Serial.println(packetBuffer[i]);
-        }
-        else {
-          Serial.print("LPS[");
-          Serial.print(i);
-          Serial.print("] = 0x");
-          Serial.println(packetBuffer[i], HEX);
-        }
-      }
-    }
-
-    if (packetBuffer[1] == RESET_ME_PACKET) {
-      Serial.println(">>>>>>>>>RESET_ME_PACKET Packet Recieved");
-
-      if (packetBuffer[2] == swarmAddresses[mySwarmID]) {
-        masterState = true;
-        Serial.println("Reset Me:  I just BECAME Master");
-        digitalWrite(0, LOW);
-      } 
-      else {
-        Serial.print("Wanted #");
-        Serial.print(packetBuffer[2]);
-        Serial.println(" Not me - reset ignored");
-      }
-    }
   }
 
   if (packetBuffer[1] == DEFINE_SERVER_LOGGER_PACKET) {
@@ -241,26 +201,12 @@ void loop() {
     Serial.println(serverAddress);
   }
 
-  if (packetBuffer[1] == BLINK_BRIGHT_LED) {
-    Serial.println(">>>>>>>>>BLINK_BRIGHT_LED Packet Recieved");
-    if (packetBuffer[2] == swarmAddresses[mySwarmID]) {
-      digitalWrite(LED_BUILTIN, HIGH);
-      delay(packetBuffer[4] * 100);
-      digitalWrite(LED_BUILTIN, LOW);
-    }
-    else {
-      Serial.print("Wanted #");
-      Serial.print(packetBuffer[2]);
-      Serial.println(" Not me - reset ignored");
-    }
-  }
-
   if (masterState == true && millis() - master_clock >= 200) {
     sendLogToServer();
     master_clock = millis();
   }
 
-  broadcastARandomUpdatePacket();
+  checkAndSendUpdatePacket();
 }
 
 // send an LIGHT Packet request to the swarms at the given address
@@ -288,7 +234,7 @@ void sendLightUpdatePacket(IPAddress &address) {
   udp.endPacket();
 }
 
-void broadcastARandomUpdatePacket() {
+void checkAndSendUpdatePacket() {
   /*
    * First check if it's our "turn" to send a new packet.
    * If it's been more than 200ms since we last received (or sent) a packet, 

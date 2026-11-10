@@ -4,14 +4,11 @@
     December 2020
 '''
 from __future__ import print_function
- 
 from builtins import chr
 from builtins import range
 import time 
 from gpiozero import LED, Button
-
 from netifaces import interfaces, ifaddresses, AF_INET
-
 from socket import *
 
 VERSIONNUMBER = 7
@@ -25,6 +22,10 @@ LOG_TO_SERVER_PACKET = 5
 MASTER_CHANGE_PACKET = 6
 BLINK_BRIGHT_LED = 7
 
+# I decided to have the server and the swarms communicate on separate ports.
+# With the previous setup, the server was receiving every light update packet
+# from every swarm member, which seemed to defeat the purpose of using a
+# master/slave architecture for logging to the server.
 MYPORT = 2910
 SWARMPORT = 2911
 SWARMSIZE = 3
@@ -55,8 +56,8 @@ def SendDEFINE_SERVER_LOGGER_PACKET(s):
     print(addresses)
     myIP = addresses[0].split('.')
     print(myIP) 
-    data= ["" for i in range(8)]
 
+    data= ["" for i in range(8)]
     data[0] = int("F0", 16).to_bytes(1,'little') 
     data[1] = int(DEFINE_SERVER_LOGGER_PACKET).to_bytes(1,'little')
     data[2] = int("FF", 16).to_bytes(1,'little') # swarm id (FF means not part of swarm)
@@ -73,7 +74,6 @@ def SendRESET_SWARM_PACKET(s):
     s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
     data= ["" for i in range(8)]
-
     data[0] = int("F0", 16).to_bytes(1,'little')
     data[1] = int(RESET_SWARM_PACKET).to_bytes(1,'little')
     data[2] = int("FF", 16).to_bytes(1,'little') # swarm id (FF means not part of swarm)
@@ -92,13 +92,10 @@ def SendRESET_SWARM_PACKET(s):
     time.sleep(3)
     white_led.off()
 
-reset_button.when_pressed = lambda: SendRESET_SWARM_PACKET(s)
-
 def parseLogPacket(message):
 	print("Log From SwarmID:",(message[2]))
 	print("Swarm Software Version:", (message[4]))
 	
-	print("StringLength:",(message[3]))
 	logString = ""
 	for i in range(0,(message[3])):
 		logString = logString + chr((message[i+5]))
@@ -106,6 +103,7 @@ def parseLogPacket(message):
 	#print("logString:", logString)	
 	return logString	
 
+# Calculates the speed of blinking as well as which LED to blink
 def calcBlinkInfo(logString, swarmSize):
     swarmList = logString.split("|")
     # find the master and the average light value across the swarm
@@ -119,15 +117,18 @@ def calcBlinkInfo(logString, swarmSize):
             light_val += int(swarmElement[3])
             swarm_count += 1
 
+            # Which LED is associated with which IP will depend on their order
+            # in the received packet
             if swarmElement[5] not in swarm_ips:
                 swarm_ips.append(swarmElement[5])
-                print(f"found new IP: {swarmElement[5]}")
+                print(f"Found new IP: {swarmElement[5]}")
             if (swarmElement[1] == "1"):
                 master = swarm_ips.index(swarmElement[5])
 
     light_val /= swarm_count
     # should do the same thing as Arduino map(val, 0, 4096, 50, 2000)
     blink_speed = (((4096 - light_val) / 4096) * 1950) + 50
+    # convert from ms to s
     blink_speed /= 1000
     return (master, blink_speed)
 
@@ -161,11 +162,13 @@ for i in range(0,SWARMSIZE):
 	swarmStatus[i][0] = "NP"
 	swarmStatus[i][5] = 0
 
-#300 seconds round
+# 300 seconds round
 seconds_300_round = time.time() + 300.0
 
+reset_button.when_pressed = lambda: SendRESET_SWARM_PACKET(s)
+
 while(1) :  
-    # blink the master's LED at a speed proportional to swarm brightness
+    # blink the master's LED at a speed proportional to average swarm brightness
     if (time.time() - blink_clock > blink_speed):
         for i in range(SWARMSIZE):
             # only the master blinks
