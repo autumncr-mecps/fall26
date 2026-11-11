@@ -9,7 +9,7 @@
 #include <stdlib.h>
 #include <math.h>
 #include <string.h>
-
+#include <time.h>
 
 #define VERBOSE 0
 
@@ -69,6 +69,7 @@ int main(int argc, char* argv[])
 
    for(i=0; i<IMG_NUM; i++)
    {
+      printf("\nIMAGE %d\n", i);
       n = i % AVAIL_IMG;
       sprintf(infilename, IMG_IN, n+1);
       /****************************************************************************
@@ -162,6 +163,8 @@ void canny(unsigned char *image, int rows, int cols, float sigma,
 void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
         short int *magnitude)
 {
+   clock_t start = clock();
+
    int r, c, pos, sq1, sq2;
 
    for(r=0,pos=0;r<rows;r++){
@@ -171,7 +174,11 @@ void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
          magnitude[pos] = (short)(0.5 + sqrt((float)sq1 + (float)sq2));
       }
    }
+   
 
+   clock_t finish = clock();
+   double totaltime = (double)(finish-start)/CLOCKS_PER_SEC;
+   printf("magnitude_x_y run time %f secs\n", totaltime);
 }
 
 /*******************************************************************************
@@ -189,6 +196,8 @@ void magnitude_x_y(short int *delta_x, short int *delta_y, int rows, int cols,
 void derivative_x_y(short int *smoothedim, int rows, int cols,
         short int *delta_x, short int *delta_y)
 {
+   clock_t start = clock();
+
    int r, c, pos;
 
    /****************************************************************************
@@ -220,6 +229,11 @@ void derivative_x_y(short int *smoothedim, int rows, int cols,
       }
       delta_y[pos] = smoothedim[pos] - smoothedim[pos-cols];
    }
+   
+
+   clock_t finish = clock();
+   double totaltime = (double)(finish-start)/CLOCKS_PER_SEC;
+   printf("derivative_x_y run time %f secs\n", totaltime);
 }
 
 /*******************************************************************************
@@ -251,6 +265,8 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
    /****************************************************************************
    * Blur in the x - direction.
    ****************************************************************************/
+   clock_t start = clock();
+
    if(VERBOSE) printf("   Bluring the image in the X-direction.\n");
    for(r=0;r<rows;r++){
       for(c=0;c<cols;c++){
@@ -266,9 +282,15 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
       }
    }
 
+   clock_t finish = clock();
+   double totaltime = (double)(finish-start)/CLOCKS_PER_SEC;
+   printf("blur_x run time %f secs\n", totaltime);
+
    /****************************************************************************
    * Blur in the y - direction.
    ****************************************************************************/
+   start = clock();
+
    if(VERBOSE) printf("   Bluring the image in the Y-direction.\n");
    for(c=0;c<cols;c++){
       for(r=0;r<rows;r++){
@@ -283,6 +305,10 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
          smoothedim[r*cols+c] = (short int)(dot*BOOSTBLURFACTOR/sum + 0.5);
       }
    }
+
+   finish = clock();
+   totaltime = (double)(finish-start)/CLOCKS_PER_SEC;
+   printf("blur_y run time %f secs\n", totaltime);
 }
 
 /*******************************************************************************
@@ -293,6 +319,8 @@ void gaussian_smooth(unsigned char *image, int rows, int cols, float sigma,
 *******************************************************************************/
 void make_gaussian_kernel(float sigma, float *kernel, int *windowsize)
 {
+   clock_t start = clock();
+
    int i, center;
    float x, fx, sum=0.0;
 
@@ -315,6 +343,10 @@ void make_gaussian_kernel(float sigma, float *kernel, int *windowsize)
       for(i=0;i<(*windowsize);i++)
          printf("kernel[%d] = %f\n", i, kernel[i]);
    }
+
+   clock_t finish = clock();
+   double totaltime = (double)(finish-start)/CLOCKS_PER_SEC;
+   printf("make_gaussian_kernel run time %f secs\n", totaltime);
 }
 
 /*******************************************************************************
@@ -356,6 +388,8 @@ void follow_edges(unsigned char *edgemapptr, short *edgemagptr, short lowval,
 void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
 	float tlow, float thigh, unsigned char *edge)
 {
+   clock_t start = clock();
+
    int r, c, pos, numedges, highcount, lowthreshold, highthreshold, hist[32768];
    short int maximum_mag=0;
 
@@ -449,6 +483,10 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
    for(r=0,pos=0;r<rows;r++){
       for(c=0;c<cols;c++,pos++) if(edge[pos] != EDGE) edge[pos] = NOEDGE;
    }
+   
+   clock_t finish = clock();
+   double totaltime = (double)(finish-start)/CLOCKS_PER_SEC;
+   printf("apply_hysteresis run time %f secs\n", totaltime);
 }
 
 /*******************************************************************************
@@ -461,6 +499,8 @@ void apply_hysteresis(short int *mag, unsigned char *nms, int rows, int cols,
 void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
     unsigned char *result)
 {
+   clock_t start = clock();
+
     int rowcount, colcount,count;
     short *magrowptr,*magptr;
     short *gxrowptr,*gxptr;
@@ -654,6 +694,11 @@ void non_max_supp(short *mag, short *gradx, short *grady, int nrows, int ncols,
             }
         }
     }
+    
+
+   clock_t finish = clock();
+   double totaltime = (double)(finish-start)/CLOCKS_PER_SEC;
+   printf("non_max_supp run time %f secs\n", totaltime);
 }
 
 /******************************************************************************
