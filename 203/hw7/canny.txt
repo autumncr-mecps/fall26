@@ -1,0 +1,12 @@
+This was quite a straightforward assignment, and I had no I had no significant problems! Here's what I discovered for timings -- it seems to roughly match what I saw in the profiler for HW6.
+
+Gaussian_Smooth                   0.423 sec
+|------ Gaussian_Kernel 0.000 sec
+|------ BlurX           0.183 sec
+\------ BlurY           0.240 sec
+Derivative_X_Y                    0.052 sec
+Magnitude_X_Y                     0.054 sec
+Non_Max_Supp                      0.129 sec
+Apply_Hysteresis                  0.140 sec
+----------------------- --------------
+TOTAL                             0.796 sec
