@@ -26,7 +26,7 @@ char ssid[] = "KittenLAN"; //  your network SSID (name)
 char pass[] = "kittens_r_c00l"; // your network password
 
 #define PHOTOR 36 // pin 36 for the photoresistor
-#define MASTER_LED STATUS_LED
+#define MASTER_LED LED_BUILTIN
 #define STATUS_LED 15
 int light_val;
 int blink_speed = INT_MAX;
