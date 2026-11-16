@@ -7,9 +7,11 @@ from __future__ import print_function
 from builtins import chr
 from builtins import range
 import time 
+import datetime
 from gpiozero import LED, Button
 from netifaces import interfaces, ifaddresses, AF_INET
 from socket import *
+from collections import deque 
 
 VERSIONNUMBER = 7
 # packet type definitions
@@ -32,13 +34,13 @@ SWARMSIZE = 3
 
 # GPIO outputs
 reset_button = Button(4)
+reset_led = LED(12)
 swarm_led = (LED(16), LED(20), LED(21))
 swarm_ips = []
-white_led = LED(12)
 master = -1
-blink_speed = float('inf')
-blink_clock = time.time()
-blink_led_val = False
+
+photor_vals = deque([])
+master_vals = deque([])
 
 logString = ""
 
@@ -69,8 +71,8 @@ def SendDEFINE_SERVER_LOGGER_PACKET(s):
     mymessage = ''.encode()  	
     s.sendto(mymessage.join(data), ('<broadcast>'.encode(), SWARMPORT))
 
-def SendRESET_SWARM_PACKET(s):
-    print("RESET_SWARM_PACKET Sent") 
+def resetSwarm(s):
+    print("Resetting swarm")
     s.setsockopt(SOL_SOCKET, SO_BROADCAST, 1)
 
     data= ["" for i in range(8)]
@@ -85,52 +87,52 @@ def SendRESET_SWARM_PACKET(s):
       	
     mymessage = ''.encode()  	
     s.sendto(mymessage.join(data), ('<broadcast>'.encode(), SWARMPORT))
+    print("RESET_SWARM_PACKET Sent") 
     
     # Once we've sent the reset instruction, turn the LED on and sleep for
     # three seconds (to give swarm time to reset)
-    white_led.on()
+    reset_led.on()
     time.sleep(3)
-    white_led.off()
+    reset_led.off()
 
-def parseLogPacket(message):
+    startLogFile()
+
+# Calculates the speed of blinking as well as which LED to blink
+def calcLogInfo(message, swarmSize):
 	print("Log From SwarmID:",(message[2]))
 	print("Swarm Software Version:", (message[4]))
 	
 	logString = ""
 	for i in range(0,(message[3])):
 		logString = logString + chr((message[i+5]))
-
-	#print("logString:", logString)	
-	return logString	
-
-# Calculates the speed of blinking as well as which LED to blink
-def calcBlinkInfo(logString, swarmSize):
+    
     swarmList = logString.split("|")
     # find the master and the average light value across the swarm
     master = -1
     light_val = 0
-    swarm_count = 0
-    for i in range(0,swarmSize):
+    for i in range(0, swarmSize):
         swarmElement = swarmList[i].split(",")
         print(swarmElement)
         if (swarmElement[4] == "PR"):
-            light_val += int(swarmElement[3])
-            swarm_count += 1
-
             # Which LED is associated with which IP will depend on their order
             # in the received packet
             if swarmElement[5] not in swarm_ips:
                 swarm_ips.append(swarmElement[5])
                 print(f"Found new IP: {swarmElement[5]}")
+            
             if (swarmElement[1] == "1"):
                 master = swarm_ips.index(swarmElement[5])
+                light_val = int(swarmElement[3])
+                photor_vals.append(light_val)
+                swarm_led[i].on()
+            else:
+                swarm_led[i].off()
 
-    light_val /= swarm_count
-    # should do the same thing as Arduino map(val, 0, 4096, 50, 2000)
-    blink_speed = (((4096 - light_val) / 4096) * 1950) + 50
-    # convert from ms to s
-    blink_speed /= 1000
-    return (master, blink_speed)
+def startLogFile():
+    global f
+    f.close()
+    filename = "lightswarm_log_" + datetime.datetime.now().strftime("%m_%d_%Y__%H_%M_%S") + ".csv"
+    f.open(filename, "w")
 
 # set up sockets for UDP
 s=socket(AF_INET, SOCK_DGRAM)
@@ -165,25 +167,9 @@ for i in range(0,SWARMSIZE):
 # 300 seconds round
 seconds_300_round = time.time() + 300.0
 
-reset_button.when_pressed = lambda: SendRESET_SWARM_PACKET(s)
+reset_button.when_pressed = lambda: resetSwarm(s)
 
-while(1) :  
-    # blink the master's LED at a speed proportional to average swarm brightness
-    if (time.time() - blink_clock > blink_speed):
-        for i in range(SWARMSIZE):
-            # only the master blinks
-            if i != master:
-                swarm_led[i].off()
-            else:
-                # if the led is currently on, turn it off
-                if blink_led_val:
-                    swarm_led[i].off()
-                # if it's currently off, turn it on
-                else:
-                    swarm_led[i].on()
-                blink_led_val = not blink_led_val
-        blink_clock = time.time()
-
+while(1) :
     if (time.time() >  seconds_300_round):
         print(">>>>doing 300 second task")
         SendDEFINE_SERVER_LOGGER_PACKET(s)
@@ -200,8 +186,7 @@ while(1) :
         print("Swarm LOG_TO_SERVER_PACKET Received")
 
         # process the Log Packet
-        logString = parseLogPacket(message)
-        (master, blink_speed) = calcBlinkInfo(logString, SWARMSIZE)
+        logString = calcLogInfo(message, SWARMSIZE)
 
     else:
         print("error message length = ",len(message))
