@@ -12,6 +12,7 @@ from gpiozero import LED, Button
 from netifaces import interfaces, ifaddresses, AF_INET
 from socket import *
 from collections import deque 
+import matplotlib.pyplot as plt
 
 VERSIONNUMBER = 7
 # packet type definitions
@@ -31,6 +32,7 @@ BLINK_BRIGHT_LED = 7
 MYPORT = 2910
 SWARMPORT = 2911
 SWARMSIZE = 3
+LOGLENGTH = 30
 
 # GPIO outputs
 reset_button = Button(4)
@@ -39,10 +41,8 @@ swarm_led = (LED(16), LED(20), LED(21))
 swarm_ips = []
 master = -1
 
-photor_vals = deque([])
-master_vals = deque([])
-
-logString = ""
+photor_data = deque([])
+master_data = deque([])
 
 # UDP Commands and packets
 def SendDEFINE_SERVER_LOGGER_PACKET(s):
@@ -98,14 +98,14 @@ def resetSwarm(s):
     startLogFile()
 
 # Calculates the speed of blinking as well as which LED to blink
-def calcLogInfo(message, swarmSize):
-	print("Log From SwarmID:",(message[2]))
-	print("Swarm Software Version:", (message[4]))
-	
-	logString = ""
-	for i in range(0,(message[3])):
-		logString = logString + chr((message[i+5]))
-    
+def calcLogInfo(message, swarmSize, log_data):
+    print("Log From SwarmID:",(message[2]))
+    print("Swarm Software Version:", (message[4]))
+
+    logString = ""
+    for i in range(0,(message[3])):
+        logString += chr((message[i+5]))
+
     swarmList = logString.split("|")
     # find the master and the average light value across the swarm
     master = -1
@@ -120,13 +120,24 @@ def calcLogInfo(message, swarmSize):
                 swarm_ips.append(swarmElement[5])
                 print(f"Found new IP: {swarmElement[5]}")
             
-            if (swarmElement[1] == "1"):
+            if swarmElement[1] == "1":
                 master = swarm_ips.index(swarmElement[5])
                 light_val = int(swarmElement[3])
-                photor_vals.append(light_val)
+                photor_data.append(light_val)
+                master_data.append(i)
+
+                if len(photor_data) > LOGLENGTH:
+                    photor_data.popleft()
+                if len(master_data) > LOGLENGTH:
+                    master_data.popleft()
+
+                f.write(f"{i}, {light_val}\n")
                 swarm_led[i].on()
             else:
                 swarm_led[i].off()
+
+def plot(log_data):
+    #plt.plot()
 
 def startLogFile():
     global f
@@ -168,6 +179,7 @@ for i in range(0,SWARMSIZE):
 seconds_300_round = time.time() + 300.0
 
 reset_button.when_pressed = lambda: resetSwarm(s)
+startLogFile()
 
 while(1) :
     if (time.time() >  seconds_300_round):
@@ -186,7 +198,8 @@ while(1) :
         print("Swarm LOG_TO_SERVER_PACKET Received")
 
         # process the Log Packet
-        logString = calcLogInfo(message, SWARMSIZE)
+        calcLogInfo(message, SWARMSIZE, photor_data)
+        plot(photor_data)
 
     else:
         print("error message length = ",len(message))
