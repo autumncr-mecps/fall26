@@ -50,12 +50,10 @@ data_points = deque([])
 master_counts = [0, 0, 0]
 master_counts_total = [0, 0, 0]
 colors = ["white", "green", "red"]
-muted_colors = ["#880000", "#888888", "#005500"]
+muted_colors = ["#888888", "#005500", "#880000"]
 
 # Setting up the chart(s). Using a dark gray background so that the white shows up
-def setupChart(fig, ax_light, ax_master, ax_totals):
-    fig.patch.set_facecolor("#222222")
-
+def setupChart(ax_light, ax_master, ax_totals):
     ax_light.set_title("Light Sensor Readings")
     ax_light.set_xlabel("Seconds")
     ax_light.set_ylabel("Photoresistor Reading")
@@ -77,6 +75,7 @@ def setupChart(fig, ax_light, ax_master, ax_totals):
     ax_master.set_title("Masters Last 30 Sec")
     ax_master.set_xlabel("Last section of IP")
     ax_master.set_ylabel("Seconds as master")
+    ax_master.set_ylim(0, LOGLENGTH)
     ax_master.set_facecolor("#222222")
     ax_master.yaxis.set_major_formatter(   
         tkr.FuncFormatter(lambda y, _: f"{round(y)}") # rounds them nicely back to 1, 2, 3
@@ -94,6 +93,7 @@ def setupChart(fig, ax_light, ax_master, ax_totals):
     ax_totals.set_title("Masters All Time")
     ax_totals.set_xlabel("Last section of IP")
     ax_totals.set_ylabel("Percent time master")
+    ax_totals.set_ylim(0, 100)
     ax_totals.set_facecolor("#222222")
     ax_totals.yaxis.set_major_formatter(   
         tkr.FuncFormatter(lambda y, _: f"{round(y)}") # rounds them nicely back to 1, 2, 3
@@ -109,7 +109,8 @@ def setupChart(fig, ax_light, ax_master, ax_totals):
     ax_totals.spines["left"].set_color("#BBBBBB")
 
 fig, (ax_light, ax_master, ax_totals) = plt.subplots(1, 3, figsize=(12,5), width_ratios=[4, 1, 1])
-setupChart(fig, ax_light, ax_master, ax_totals)
+fig.patch.set_facecolor("#222222")
+setupChart(ax_light, ax_master, ax_totals)
 plt.ion()
 plt.show()
 
@@ -191,39 +192,38 @@ def calcLogInfo(message, swarmSize, data_points, master_counts, master_counts_to
             if swarmElement[1] == "1":
                 master = swarm_ips.index(swarmElement[5])
                 light_val = int(swarmElement[3])
-                data_points.append((light_val, master, time.time() - start_time))
+                data_points.append((light_val, master, round(time.time() - start_time)))
                 master_counts[master] += 1
                 master_counts_total[master] += 1
+                f.write(f"{swarm_ips[master].strip()}, {light_val}, {master_counts_total[master]}\n")
+    
+    for led in swarm_led:
+        led.off()
+    swarm_led[master].on()
 
     # update the graph
     if len(data_points) > LOGLENGTH:
         removed_point = data_points.popleft()
         master_counts[removed_point[1]] -= 1
 
-        plt.cla()
+        ax_light.cla()
+        ax_master.cla()
+        ax_totals.cla()
+        setupChart(ax_light, ax_master, ax_totals)
         for j in np.arange(len(data_points)-1):
             point = data_points[j]
             next_point = data_points[j+1]
-            # this if statement provides discontinuity between different masters' segments
-            if point[1] == next_point[1]:
-                ax_light.plot([point[2],next_point[2]], [point[0],next_point[0]], c=colors[next_point[1]])
-        # apparently have to do this here too
-        ax_light.set_ylim(0, 4096)
+            ax_light.plot([point[2],next_point[2]], [point[0],next_point[0]], c=colors[next_point[1]])
         # plot the counts of who has been the master the past 30 seconds
         bars = ax_master.bar(swarm_ips, master_counts, color=colors)
         ax_master.bar_label(bars, label_type="center")
         # report who has been the master over the lifetime of the server
-        sum = sum(master_counts_total)
-        for k in range(3):
-            bar = ax_totals.bar(swarm_ips[k], round(master_counts_total[k]/sum*100),  color=muted_colors[k])
+        total_sum = sum(master_counts_total)
+        for k in range(len(swarm_ips)):
+            bar = ax_totals.bar(swarm_ips[k], round(master_counts_total[k]/total_sum*100),  color=muted_colors[k])
             ax_totals.bar_label(bar, label_type="center")
         plt.draw()
         plt.pause(0.001)
-
-        f.write(f"{swarm_ips[master]}, {light_val}, {master_counts_total[master]}\n")
-        swarm_led[master].on()
-    else:
-        swarm_led[master].off()
 
 def startLogFile():
     global f
@@ -231,7 +231,7 @@ def startLogFile():
         f.close()
     filename = "logs/lightswarm_log_" + datetime.datetime.now().strftime("%m_%d_%Y__%H_%M_%S") + ".csv"
     f = open(filename, "w")
-    f.write("master, sensor_data, time_as_master")
+    f.write("master, sensor_data, time_as_master\n")
 
 # set up sockets for UDP
 s=socket(AF_INET, SOCK_DGRAM)
