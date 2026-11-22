@@ -13,6 +13,8 @@ from netifaces import interfaces, ifaddresses, AF_INET
 from socket import *
 from collections import deque 
 import matplotlib.pyplot as plt
+import matplotlib.ticker as tkr
+import numpy as np
 
 VERSIONNUMBER = 7
 # packet type definitions
@@ -41,8 +43,32 @@ swarm_led = (LED(16), LED(20), LED(21))
 swarm_ips = []
 master = -1
 
-photor_data = deque([])
-master_data = deque([])
+start_time = time.process_time()
+data_points = deque([])
+colors = ["red", "white", "green"]
+
+# Setting up the 
+def setupChart(fig, ax):
+    plt.title("Light Sensor Readings")
+    fig.patch.set_facecolor("#222222")
+    ax.set_ylim(0, 4096)
+    ax.xaxis.set_major_formatter(   
+        tkr.FuncFormatter(lambda x, _: f'{round(x)}') # rounds them nicely back to 1, 2, 3
+    )
+    ax.set_facecolor("#222222")
+    ax.title.set_color("#BBBBBB")
+    ax.yaxis.label.set_color("#BBBBBB")
+    ax.xaxis.label.set_color("#BBBBBB")
+    ax.tick_params(axis="x", colors="#BBBBBB")
+    ax.tick_params(axis="y", colors="#BBBBBB")
+    ax.spines["top"].set_color("#BBBBBB")
+    ax.spines["right"].set_color("#BBBBBB")
+    ax.spines["bottom"].set_color("#BBBBBB")
+    ax.spines["left"].set_color("#BBBBBB")
+
+fig = plt.figure(1, figsize=(10,5))
+ax = plt.gca()
+setupChart(fig, ax)
 
 # UDP Commands and packets
 def SendDEFINE_SERVER_LOGGER_PACKET(s):
@@ -98,7 +124,7 @@ def resetSwarm(s):
     startLogFile()
 
 # Calculates the speed of blinking as well as which LED to blink
-def calcLogInfo(message, swarmSize, log_data):
+def calcLogInfo(message, swarmSize, data_points):
     print("Log From SwarmID:",(message[2]))
     print("Swarm Software Version:", (message[4]))
 
@@ -123,21 +149,23 @@ def calcLogInfo(message, swarmSize, log_data):
             if swarmElement[1] == "1":
                 master = swarm_ips.index(swarmElement[5])
                 light_val = int(swarmElement[3])
-                photor_data.append(light_val)
-                master_data.append(i)
+                data_points.append((light_val, i, time.process_time()))
 
-                if len(photor_data) > LOGLENGTH:
-                    photor_data.popleft()
-                if len(master_data) > LOGLENGTH:
-                    master_data.popleft()
+                # update the graph
+                if len(data_points) > LOGLENGTH:
+                    data_points.popleft()
+
+                    for i in np.arange(len(data_points)-1):
+                        point = data_points[i]
+                        next_point = data_points[i+1]
+                        ax.plot([point[3],next_point[3]], [point[1],next_point[1]], c=colors[point[2]])
+
+                    plt.show()
 
                 f.write(f"{i}, {light_val}\n")
                 swarm_led[i].on()
             else:
                 swarm_led[i].off()
-
-def plot(log_data):
-    #plt.plot()
 
 def startLogFile():
     global f
@@ -198,8 +226,7 @@ while(1) :
         print("Swarm LOG_TO_SERVER_PACKET Received")
 
         # process the Log Packet
-        calcLogInfo(message, SWARMSIZE, photor_data)
-        plot(photor_data)
+        calcLogInfo(message, SWARMSIZE, data_points)
 
     else:
         print("error message length = ",len(message))

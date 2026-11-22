@@ -1,8 +1,9 @@
 import matplotlib.pyplot as plt
+import matplotlib.ticker as tkr
 import numpy as np
 
 # -------------- Create and show plot --------------
-x = np.linspace(0, 30, 30)
+x = np.linspace(0, 6, 30)
 y = np.random.random(30) * 4096
 z = [0, 0, 0, 0, 0, 2, 2, 2, 2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 
@@ -12,6 +13,9 @@ def setupChart(fig, ax):
     plt.title("Light Sensor Readings")
     fig.patch.set_facecolor("#222222")
     ax.set_facecolor("#222222")
+    ax.xaxis.set_major_formatter(   
+        tkr.FuncFormatter(lambda x, _: f'{round(x)}') # rounds them nicely back to 1, 2, 3
+    )
     ax.title.set_color("#BBBBBB")
     ax.yaxis.label.set_color("#BBBBBB")
     ax.xaxis.label.set_color("#BBBBBB")
