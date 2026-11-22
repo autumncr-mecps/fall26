@@ -69,14 +69,16 @@ def setupChart(fig, ax_light, ax_master, ax_totals):
     ax_totals.spines["bottom"].set_color("#BBBBBB")
     ax_totals.spines["left"].set_color("#BBBBBB")
 
-fig, (ax_light, ax_master, ax_totals) = plt.subplots(1, 3, figsize=(12,5), width_ratios=[6, 2, 1])
+fig, (ax_light, ax_master, ax_totals) = plt.subplots(1, 3, figsize=(12,5), width_ratios=[4, 1, 1])
 setupChart(fig, ax_light, ax_master, ax_totals)
 for i in np.arange(len(x)-1):
     ax_light.plot([x[i],x[i+1]], [y[i],y[i+1]], c=colors[z[i]])
 
-ax_master.bar(masters, bar_data, color=colors)
+bars = ax_master.bar(masters, bar_data, color=colors)
+ax_master.bar_label(bars, label_type='center')
 sum = sum(bar_totals)
 for i in range(3):
-    ax_totals.bar(masters[i], bar_totals[i]/sum * 100, color=muted_colors[i])
+    bar = ax_totals.bar(masters[i], round(bar_totals[i]/sum * 100), color=muted_colors[i])
+    ax_totals.bar_label(bar, label_type="center")
 
 plt.show()
