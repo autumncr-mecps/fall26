@@ -162,13 +162,21 @@ def resetSwarm(s):
     # Once we've sent the reset instruction, turn the LED on and sleep for
     # three seconds (to give swarm time to reset)
     reset_led.on()
-    time.sleep(3)
-    reset_led.off()
+    for led in swarm_led:
+        led.off()
 
     ax_light.cla()
     ax_master.cla()
     ax_totals.cla()
     setupChart(ax_light, ax_master, ax_totals)
+    global master_counts, master_counts_total, data_points
+    master_counts = [0, 0, 0]
+    master_counts_total = [0, 0, 0]
+    data_points.clear()
+    plt.draw()
+    plt.pause(3)
+
+    reset_led.off()
     startLogFile()
 
 # Calculates the speed of blinking as well as which LED to blink
@@ -250,7 +258,8 @@ print("--------------")
 
 # first send out DEFINE_SERVER_LOGGER_PACKET to tell swarm where to send logging information 
 defineServer(s)
-time.sleep(3)
+plt.draw()
+plt.pause(3)
 defineServer(s)
 # swarmStatus
 swarmStatus = [[0 for x  in range(6)] for x in range(SWARMSIZE)]
@@ -270,10 +279,13 @@ for i in range(0,SWARMSIZE):
 # 300 seconds round
 seconds_300_round = time.time() + 300.0
 
-reset_button.when_pressed = lambda: resetSwarm(s)
+#reset_button.when_pressed = lambda: resetSwarm(s)
 startLogFile()
 
 while(1) :
+    if reset_button.is_pressed:
+        resetSwarm(s)
+
     if (time.time() >  seconds_300_round):
         print(">>>>doing 300 second task")
         defineServer(s)
