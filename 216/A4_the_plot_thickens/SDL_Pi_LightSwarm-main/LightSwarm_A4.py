@@ -12,6 +12,8 @@ from gpiozero import LED, Button
 from netifaces import interfaces, ifaddresses, AF_INET
 from socket import *
 from collections import deque 
+import matplotlib
+matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 import matplotlib.ticker as tkr
 import numpy as np
@@ -43,18 +45,15 @@ swarm_led = (LED(16), LED(20), LED(21))
 swarm_ips = []
 master = -1
 
-start_time = time.process_time()
+start_time = time.time()
 data_points = deque([])
-colors = ["red", "white", "green"]
+colors = ["white", "green", "red"]
 
 # Setting up the 
 def setupChart(fig, ax):
     plt.title("Light Sensor Readings")
     fig.patch.set_facecolor("#222222")
     ax.set_ylim(0, 4096)
-    ax.xaxis.set_major_formatter(   
-        tkr.FuncFormatter(lambda x, _: f'{round(x)}') # rounds them nicely back to 1, 2, 3
-    )
     ax.set_facecolor("#222222")
     ax.title.set_color("#BBBBBB")
     ax.yaxis.label.set_color("#BBBBBB")
@@ -69,6 +68,8 @@ def setupChart(fig, ax):
 fig = plt.figure(1, figsize=(10,5))
 ax = plt.gca()
 setupChart(fig, ax)
+plt.ion()
+plt.show()
 
 # UDP Commands and packets
 def SendDEFINE_SERVER_LOGGER_PACKET(s):
@@ -126,7 +127,6 @@ def resetSwarm(s):
 # Calculates the speed of blinking as well as which LED to blink
 def calcLogInfo(message, swarmSize, data_points):
     print("Log From SwarmID:",(message[2]))
-    print("Swarm Software Version:", (message[4]))
 
     logString = ""
     for i in range(0,(message[3])):
@@ -149,29 +149,34 @@ def calcLogInfo(message, swarmSize, data_points):
             if swarmElement[1] == "1":
                 master = swarm_ips.index(swarmElement[5])
                 light_val = int(swarmElement[3])
-                data_points.append((light_val, i, time.process_time()))
+                data_points.append((light_val, master, time.time() - start_time))
 
-                # update the graph
-                if len(data_points) > LOGLENGTH:
-                    data_points.popleft()
+    # update the graph
+    if len(data_points) > LOGLENGTH:
+        data_points.popleft()
 
-                    for i in np.arange(len(data_points)-1):
-                        point = data_points[i]
-                        next_point = data_points[i+1]
-                        ax.plot([point[3],next_point[3]], [point[1],next_point[1]], c=colors[point[2]])
+        plt.cla()
+        for j in np.arange(len(data_points)-1):
+            point = data_points[j]
+            next_point = data_points[j+1]
+            if point[1] == next_point[1]:
+                ax.plot([point[2],next_point[2]], [point[0],next_point[0]], c=colors[next_point[1]])
+        
+        ax.set_ylim(0, 4096)
+        plt.draw()
+        plt.pause(0.001)
 
-                    plt.show()
-
-                f.write(f"{i}, {light_val}\n")
-                swarm_led[i].on()
-            else:
-                swarm_led[i].off()
+        f.write(f"{master}, {light_val}\n")
+        swarm_led[master].on()
+    else:
+        swarm_led[master].off()
 
 def startLogFile():
     global f
-    f.close()
-    filename = "lightswarm_log_" + datetime.datetime.now().strftime("%m_%d_%Y__%H_%M_%S") + ".csv"
-    f.open(filename, "w")
+    if 'f' in globals():
+        f.close()
+    filename = "logs/lightswarm_log_" + datetime.datetime.now().strftime("%m_%d_%Y__%H_%M_%S") + ".csv"
+    f = open(filename, "w")
 
 # set up sockets for UDP
 s=socket(AF_INET, SOCK_DGRAM)
@@ -223,8 +228,6 @@ while(1) :
     message = d[0]
     addr = d[1]
     if ((message[1]) == LOG_TO_SERVER_PACKET):
-        print("Swarm LOG_TO_SERVER_PACKET Received")
-
         # process the Log Packet
         calcLogInfo(message, SWARMSIZE, data_points)
 
