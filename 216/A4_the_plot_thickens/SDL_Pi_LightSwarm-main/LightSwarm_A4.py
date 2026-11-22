@@ -165,6 +165,10 @@ def resetSwarm(s):
     time.sleep(3)
     reset_led.off()
 
+    ax_light.cla()
+    ax_master.cla()
+    ax_totals.cla()
+    setupChart(ax_light, ax_master, ax_totals)
     startLogFile()
 
 # Calculates the speed of blinking as well as which LED to blink

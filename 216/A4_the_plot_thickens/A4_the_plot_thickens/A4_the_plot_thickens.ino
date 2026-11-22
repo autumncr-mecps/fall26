@@ -2,6 +2,7 @@
 Cooperative IOT Self Organizing Example
 SwitchDoc Labs, August 2015
  */
+#include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <Wire.h>
@@ -20,7 +21,7 @@ SwitchDoc Labs, August 2015
 #define DEFINE_SERVER_LOGGER_PACKET 4
 #define LOG_TO_SERVER_PACKET 5
 #define MASTER_CHANGE_PACKET 6
-#define BLINK_BRIGHT_LED 7
+#define BLINK_BRIGHT_LED 7]
 
 char ssid[] = "KittenLAN"; //  your network SSID (name)
 char pass[] = "kittens_r_c00l"; // your network password
@@ -36,7 +37,7 @@ unsigned long packet_clock;
 unsigned long master_clock;
 int packet_timeout = 100;
 int long_packet_timeout = 105;
-int server_log_timeout = 100;
+int server_log_timeout = 1000;
 
 unsigned int localPort = 2911; // local port to listen for UDP packets
 unsigned int serverPort = 2910; // server's port
@@ -143,11 +144,6 @@ void setup() {
 }
 
 void loop() {
-  int secondsCount;
-  int lastSecondsCount = 0;
-  #define LOGHOWOFTEN
-  secondsCount = millis() / 100;
-
   light_val = analogRead(PHOTOR);
   swarmClear[mySwarmID] = light_val;
   int led_brightness = map(light_val, 0, 4096, 0, 255);
@@ -389,7 +385,7 @@ int setAndReturnMySwarmIndex(int incomingID) {
   // if we get here, then we have a new swarm member.   
   // Delete the oldest swarm member and add the new one in 
   // (this will probably be the one that dropped out)
-  int oldSwarmID;
+  int oldSwarmID = -1;
   long oldTime;
   oldTime = millis();
   for (i = 0; i < SWARMSIZE; i++) {
@@ -402,6 +398,7 @@ int setAndReturnMySwarmIndex(int incomingID) {
   // remove the old one and put this one in....
   swarmAddresses[oldSwarmID] = incomingID;
   // the rest will be filled in by Light Packet Receive
+  return oldSwarmID;
 }
 
 // send log packet to Server if master and server address defined
@@ -437,7 +434,9 @@ void sendLogToServer() {
           strcat(stateString, "PR");
         }
 
-        sprintf(swarmString, " %i,%i,%i,%i,%s,%i ", i, swarmState[i], swarmVersion[i], swarmClear[i], stateString, swarmAddresses[i]);
+        // element at index 0 (self) will always be master
+        int status = i == 0 ? 1 : 0;
+        sprintf(swarmString, " %i,%i,%i,%i,%s,%i ", i, status, swarmVersion[i], swarmClear[i], stateString, swarmAddresses[i]);
         strcat(myBuildString, swarmString);
         if (i < SWARMSIZE - 1) {
           strcat(myBuildString, "|");
